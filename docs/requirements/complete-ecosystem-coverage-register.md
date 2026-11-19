@@ -99,11 +99,11 @@ This is a conservative status snapshot of committed code, not a production-readi
 | Reception and queue | Not implemented | Arrival/check-in, queue, routing, appointment desk |
 | Patient registration | Partial | MPI matching/merge, consent, identity verification, guardianship, duplicate review, offline |
 | OPD | Partial | Triage/observations/diagnoses/notes/care-plan foundation; full order, referral, follow-up and clinical decision support |
-| IPD / ADT | Partial | Beds, admissions, transfers, discharge; nursing charts, rounds, medication administration, escalation and reconciliation |
-| Pharmacy | Partial | Medication orders, FEFO dispensing and stock movements; allergies, interactions, formulary, partial supply, controlled drugs, returns/recalls |
+| IPD / ADT | Partial | Beds, admissions, transfers, discharge; nursing charts, rounds, escalation and reconciliation |
+| Pharmacy | Partial | Medication orders, FEFO dispensing, stock movements and MAR capture for administered/withheld/refused doses; allergies, interactions, formulary, dose scheduling/safety, partial supply, controlled drugs, returns/recalls |
 | Procurement / inventory | Partial | Purchase orders, goods receipts, lots and stock movement events; supplier governance, approvals, stock counts, adjustments, valuation, returns and recalls |
 | Immunization | Partial | Administration and adverse-event report; schedule, eligibility, consent, cold-chain, follow-up, causality and national reporting |
-| Billing / cash | Partial | Invoices, payments and cash sessions; double-entry ledger, refunds, credit notes, tariffs, tax, reconciliation and close |
+| Billing / cash | Partial | Invoices, payments, linked cash sessions, chart of accounts and balanced journal posting; automatic subledger posting, refunds, credit notes, tariffs, tax, reconciliation, period close and reporting |
 | Laboratory | Partial | Orders, specimen collection and preliminary results; accession, multiple containers, QC, verified release, critical-result escalation and LIS |
 | Insurance | Partial | Payers, recorded eligibility, claim submission and manual decision; preauthorization, payer integration, remittance, denial/resubmission and settlement |
 | Emergency | Partial | Encounter type and triage primitives only; emergency protocols, resuscitation, observation/escalation and transfer |
@@ -121,3 +121,10 @@ This is a conservative status snapshot of committed code, not a production-readi
 | AI governance | Not implemented | No autonomous clinical decisions; governance, evaluation, provenance, human review and audit controls required |
 
 No capability marked partial is approved for live patient care, medication use, financial close or regulatory reporting solely because an endpoint exists. Every production deployment still requires end-to-end workflow tests, facility validation, security review, clinical sign-off, data migration/restore drills, operational training and country-specific approval.
+
+
+## Additional implementation update — 2026-11-19
+
+- Accounting now includes facility-scoped chart-of-accounts setup and balanced, idempotent double-entry journal posting with transactionally appended audit events. This is not a complete general ledger and database-level immutability still needs enforcement.
+- Pharmacy now includes an initial medication administration record endpoint for administered, withheld and refused doses against a dispensed order. It checks that the prescribed line is unambiguous and prevents cumulative recorded administration from exceeding dispensed quantity. It does not perform clinical dose validation, allergy/interaction checks or bedside identity/barcode verification.
+- New schema tests cover journal balance/line invariants and medication-administration decision fields. These tests are committed but have not been confirmed by a successful CI run.
