@@ -162,3 +162,28 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("scope_type", ASCENDING), ("scope_id", ASCENDING), ("version", DESCENDING)],
         unique=True, name="uq_config_scope_version",
     )
+
+    await db.triage_assessments.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("triage_id", ASCENDING)],
+        unique=True, name="uq_triage_assessment_scope_id",
+    )
+    await db.triage_assessments.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("encounter_id", ASCENDING), ("recorded_at", DESCENDING)],
+        name="ix_triage_encounter_time",
+    )
+    await db.observations.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("observation_id", ASCENDING)],
+        unique=True, name="uq_observation_scope_id",
+    )
+    await db.observations.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING), ("effective_at", DESCENDING)],
+        name="ix_observation_patient_time",
+    )
+    await db.diagnoses.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("diagnosis_id", ASCENDING)],
+        unique=True, name="uq_diagnosis_scope_id",
+    )
+    await db.diagnoses.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("encounter_id", ASCENDING), ("clinical_status", ASCENDING)],
+        name="ix_diagnosis_encounter_status",
+    )
