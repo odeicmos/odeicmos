@@ -292,3 +292,12 @@ Requires facility_admin or procurement_officer. Validates that the referenced su
 Requires facility_admin or finance_officer. Moves a submitted order to `approved_for_receipt`. The creator cannot approve their own purchase order. Approval is recorded and audited transactionally. Goods receipt remains restricted to approved orders.
 
 The procurement workflow is still partial: competitive quotations, tender evaluation, delegated spending limits, supplier sanctions/due diligence, contract management, invoice matching, returns, supplier statements and payment execution are not yet implemented.
+
+
+## Signed clinical note amendments
+
+### `POST /api/v1/clinical/notes/{note_id}/amendments`
+
+Requires facility_admin or clinician. Adds a separately signed, append-only amendment to an already signed clinical note. The amendment requires a reason and body, receives a monotonically increasing version, preserves the original note content, and is audited in the same transaction. Concurrent amendments use a guarded counter update and a unique note/version index.
+
+This is a first correction-history control. It does not replace a full legally reviewed signature, co-signature, late-entry, correction, addendum, disclosure and retention policy. Production deployment must configure database permissions to prevent mutation/deletion of signed notes and amendment records.
