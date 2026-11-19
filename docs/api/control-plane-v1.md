@@ -271,3 +271,24 @@ Requires facility_admin or receptionist. Atomically transitions a booked appoint
 Requires facility_admin, receptionist, nurse or clinician. Moves a waiting entry to in_service or cancelled, or an in_service entry to completed or cancelled. The queue and appointment lifecycle are updated together where applicable and audited transactionally.
 
 The queue is a first operational slice, not a full scheduling/flow engine. Provider calendars, capacity, walk-in intake, triage-based priority, multi-department routing, referrals, wait-time service levels, no-show processing, patient notifications and queue dashboards remain outstanding.
+
+
+## Supplier register and segregated procurement approvals
+
+### `POST /api/v1/procurement/suppliers`
+
+Requires facility_admin or procurement_officer. Creates a facility-scoped supplier master record with unique supplier code, legal name and optional contact, tax and payment-term references. Supplier deactivation and due-diligence verification workflows remain outstanding.
+
+### `POST /api/v1/procurement/purchase-orders`
+
+Creates a purchase order in `draft` status. It does not authorize receipt of goods.
+
+### `POST /api/v1/procurement/purchase-orders/{purchase_order_id}/submit`
+
+Requires facility_admin or procurement_officer. Validates that the referenced supplier is active and submits the draft for approval.
+
+### `POST /api/v1/procurement/purchase-orders/{purchase_order_id}/approve`
+
+Requires facility_admin or finance_officer. Moves a submitted order to `approved_for_receipt`. The creator cannot approve their own purchase order. Approval is recorded and audited transactionally. Goods receipt remains restricted to approved orders.
+
+The procurement workflow is still partial: competitive quotations, tender evaluation, delegated spending limits, supplier sanctions/due diligence, contract management, invoice matching, returns, supplier statements and payment execution are not yet implemented.
