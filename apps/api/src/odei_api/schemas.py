@@ -1,5 +1,5 @@
 """Validated control-plane request and response models."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,11 +58,7 @@ class PatientRegistrationCreate(BaseModel):
     medical_record_number: str = Field(min_length=1, max_length=40, pattern=r"^[A-Za-z0-9/_-]+$")
     legal_name: str = Field(min_length=2, max_length=200)
     preferred_name: str | None = Field(default=None, max_length=100)
-    date_of_birth: datetime | None = None
+    date_of_birth: date | None = None
     sex_at_birth: Literal["female", "male", "intersex", "unknown", "not_recorded"] = "not_recorded"
     phone_number: str | None = Field(default=None, min_length=5, max_length=30)
     preferred_language: str | None = Field(default=None, max_length=50)
-
-    @classmethod
-    def validate_date_of_birth(cls, value):
-        return value
