@@ -129,9 +129,12 @@ async def create_claim(payload: ClaimCreate, request: Request,
         raise HTTPException(status_code=404, detail="Invoice or eligible coverage evidence not found")
     if invoice["currency"] != payload.currency or payload.claimed_amount_minor > invoice["balance_minor"]:
         raise HTTPException(status_code=409, detail="Claim currency or amount is inconsistent with invoice balance")
+    now = datetime.now(timezone.utc)
     if eligibility["patient_id"] != invoice["patient_id"]:
         raise HTTPException(status_code=409, detail="Coverage evidence belongs to a different patient")
-    claim_id, now = str(uuid4()), datetime.now(timezone.utc)
+    if eligibility["checked_at"] > now or (eligibility.get("valid_until") and eligibility["valid_until"] < now):
+        raise HTTPException(status_code=409, detail="Eligibility evidence is outside its valid time window")
+    claim_id = str(uuid4())
     record = payload.model_dump() | {"claim_id": claim_id, "patient_id": invoice["patient_id"],
         "payer_code": eligibility["payer_code"], "status": "submitted",
         "submitted_at": now, "submitted_by_subject": principal.subject}
