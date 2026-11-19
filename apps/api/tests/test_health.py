@@ -1,5 +1,4 @@
 from fastapi.testclient import TestClient
-
 from odei_api.main import create_app
 
 
@@ -15,3 +14,9 @@ def test_readiness_fails_closed_without_mongodb_configuration() -> None:
         response = client.get("/health/ready")
     assert response.status_code == 503
     assert response.json()["detail"]["status"] == "not_ready"
+
+
+def test_control_plane_routes_reject_missing_identity() -> None:
+    with TestClient(create_app()) as client:
+        response = client.post("/api/v1/control-plane/organizations", json={})
+    assert response.status_code in (401, 503)
