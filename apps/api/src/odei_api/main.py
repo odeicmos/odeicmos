@@ -1,11 +1,9 @@
-"""FastAPI application with dependency-aware readiness checks."""
-
+"""FastAPI application with fail-closed identity and database readiness."""
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, HTTPException, Request, status
 from pymongo import AsyncMongoClient
-
 from odei_api.config import get_settings
+from odei_api.routers.control_plane import router as control_plane_router
 
 
 @asynccontextmanager
@@ -38,15 +36,10 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title=settings.app_name,
-        version="0.2.0",
-        description=(
-            "ODEI Clinic Management OS API. This increment verifies MongoDB connectivity; "
-            "authenticated business routes are not yet enabled."
-        ),
+        title=settings.app_name, version="0.3.0",
+        description="ODEI Clinic OS control-plane API. Business routes require verified OIDC identity.",
         docs_url=None if settings.environment == "production" else "/docs",
-        redoc_url=None,
-        lifespan=lifespan,
+        redoc_url=None, lifespan=lifespan,
     )
 
     @app.get("/health/live", tags=["health"])
@@ -62,6 +55,7 @@ def create_app() -> FastAPI:
             )
         return {"status": "ready", "dependencies": "mongodb"}
 
+    app.include_router(control_plane_router, prefix=settings.api_prefix)
     return app
 
 
