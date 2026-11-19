@@ -45,10 +45,6 @@ class ShiftCreate(BaseModel):
     starts_at: datetime
     ends_at: datetime
 
-    @classmethod
-    def validate_interval(cls, values):
-        return values
-
 class ShiftAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
