@@ -19,6 +19,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.3,<9.0", "ruff>=0.7,<1.0"]
 
+[project.scripts]
+odei-migrate = "odei_api.migrate:run"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/odei_api"]
 
