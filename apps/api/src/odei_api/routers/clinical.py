@@ -39,6 +39,47 @@ class ClinicalNoteCreate(BaseModel):
     body: str = Field(min_length=1, max_length=20000)
 
 
+class TriageCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    encounter_id: str = Field(min_length=1, max_length=64)
+    acuity: int = Field(ge=1, le=5)
+    presenting_concern: str = Field(min_length=2, max_length=2000)
+    temperature_c: float | None = Field(default=None, ge=25, le=45)
+    pulse_bpm: int | None = Field(default=None, ge=0, le=300)
+    respiratory_rate: int | None = Field(default=None, ge=0, le=100)
+    systolic_bp_mmhg: int | None = Field(default=None, ge=0, le=300)
+    diastolic_bp_mmhg: int | None = Field(default=None, ge=0, le=200)
+    oxygen_saturation_pct: float | None = Field(default=None, ge=0, le=100)
+    weight_kg: float | None = Field(default=None, gt=0, le=500)
+    height_cm: float | None = Field(default=None, gt=0, le=300)
+
+
+class ObservationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    encounter_id: str = Field(min_length=1, max_length=64)
+    code: str = Field(min_length=1, max_length=80)
+    display: str = Field(min_length=2, max_length=160)
+    value: float
+    unit: str = Field(min_length=1, max_length=40)
+    effective_at: datetime | None = None
+
+
+class DiagnosisCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    encounter_id: str = Field(min_length=1, max_length=64)
+    code_system: str = Field(min_length=3, max_length=200)
+    code: str = Field(min_length=1, max_length=80)
+    display: str = Field(min_length=2, max_length=200)
+    clinical_status: Literal["active", "resolved", "provisional"] = "active"
+    primary: bool = False
+
+
 class CarePlanCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
@@ -120,7 +161,7 @@ async def add_clinical_note(
     record = payload.model_dump() | {
         "note_id": note_id, "patient_id": encounter["patient_id"],
         "created_at": now, "author_issuer": principal.issuer,
-        "author_subject": principal.subject, "status": "signed",
+        "author_subject": principal.subject, "status": "draft",
     }
     client = request.app.state.mongo_client
     async with await client.start_session() as session:
@@ -134,7 +175,7 @@ async def add_clinical_note(
                 "encounter_id": payload.encounter_id}, session=session,
             )
     return {"note_id": note_id, "encounter_id": payload.encounter_id,
-            "status": "signed", "created_at": now}
+            "status": "draft", "created_at": now}
 
 
 @router.post("/care-plans", status_code=status.HTTP_201_CREATED)
@@ -173,3 +214,95 @@ async def create_care_plan(
             )
     return {"care_plan_id": plan_id, "patient_id": payload.patient_id,
             "status": "active", "created_at": now}
+
+ 
+@router.post("/triage", status_code=status.HTTP_201_CREATED)
+async def create_triage(payload: TriageCreate, request: Request,
+                        principal: Principal = Depends(require_principal)):
+    db = _db(request)
+    await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id,
+                                    ["facility_admin", "nurse", "clinician"])
+    encounter = await db.encounters.find_one({
+        "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+        "encounter_id": payload.encounter_id, "status": "open",
+    }, projection={"_id": 1, "patient_id": 1})
+    if encounter is None:
+        raise HTTPException(status_code=404, detail="Open encounter not found")
+    triage_id, now = str(uuid4()), datetime.now(timezone.utc)
+    record = payload.model_dump() | {
+        "triage_id": triage_id, "patient_id": encounter["patient_id"],
+        "recorded_at": now, "recorded_by_issuer": principal.issuer,
+        "recorded_by_subject": principal.subject,
+    }
+    client = request.app.state.mongo_client
+    async with await client.start_session() as session:
+        async with session.start_transaction():
+            await db.triage_assessments.insert_one(record, session=session)
+            await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="triage.create", resource_type="triage_assessment",
+                resource_id=triage_id, tenant_id=payload.tenant_id, outcome="success",
+                metadata={"facility_id": payload.facility_id, "encounter_id": payload.encounter_id,
+                          "acuity": payload.acuity}, session=session)
+    return {"triage_id": triage_id, "encounter_id": payload.encounter_id,
+            "acuity": payload.acuity, "recorded_at": now}
+
+
+@router.post("/observations", status_code=status.HTTP_201_CREATED)
+async def create_observation(payload: ObservationCreate, request: Request,
+                             principal: Principal = Depends(require_principal)):
+    db = _db(request)
+    await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, CLINICAL_ROLES)
+    encounter = await db.encounters.find_one({
+        "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+        "encounter_id": payload.encounter_id, "status": "open",
+    }, projection={"_id": 1, "patient_id": 1})
+    if encounter is None:
+        raise HTTPException(status_code=404, detail="Open encounter not found")
+    observation_id, now = str(uuid4()), datetime.now(timezone.utc)
+    record = payload.model_dump() | {
+        "observation_id": observation_id, "patient_id": encounter["patient_id"],
+        "effective_at": payload.effective_at or now, "recorded_at": now,
+        "recorder_issuer": principal.issuer, "recorder_subject": principal.subject,
+    }
+    client = request.app.state.mongo_client
+    async with await client.start_session() as session:
+        async with session.start_transaction():
+            await db.observations.insert_one(record, session=session)
+            await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="observation.create", resource_type="observation",
+                resource_id=observation_id, tenant_id=payload.tenant_id, outcome="success",
+                metadata={"facility_id": payload.facility_id, "encounter_id": payload.encounter_id,
+                          "code": payload.code}, session=session)
+    return {"observation_id": observation_id, "encounter_id": payload.encounter_id,
+            "recorded_at": now}
+
+
+@router.post("/diagnoses", status_code=status.HTTP_201_CREATED)
+async def create_diagnosis(payload: DiagnosisCreate, request: Request,
+                           principal: Principal = Depends(require_principal)):
+    db = _db(request)
+    await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id,
+                                    ["facility_admin", "clinician"])
+    encounter = await db.encounters.find_one({
+        "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+        "encounter_id": payload.encounter_id, "status": "open",
+    }, projection={"_id": 1, "patient_id": 1})
+    if encounter is None:
+        raise HTTPException(status_code=404, detail="Open encounter not found")
+    diagnosis_id, now = str(uuid4()), datetime.now(timezone.utc)
+    record = payload.model_dump() | {
+        "diagnosis_id": diagnosis_id, "patient_id": encounter["patient_id"],
+        "recorded_at": now, "recorder_issuer": principal.issuer,
+        "recorder_subject": principal.subject,
+    }
+    client = request.app.state.mongo_client
+    async with await client.start_session() as session:
+        async with session.start_transaction():
+            await db.diagnoses.insert_one(record, session=session)
+            await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="diagnosis.create", resource_type="diagnosis",
+                resource_id=diagnosis_id, tenant_id=payload.tenant_id, outcome="success",
+                metadata={"facility_id": payload.facility_id, "encounter_id": payload.encounter_id,
+                          "code": payload.code}, session=session)
+    return {"diagnosis_id": diagnosis_id, "encounter_id": payload.encounter_id,
+            "clinical_status": payload.clinical_status, "recorded_at": now}
