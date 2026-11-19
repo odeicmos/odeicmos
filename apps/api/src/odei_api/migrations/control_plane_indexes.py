@@ -250,3 +250,9 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("item_code", ASCENDING), ("occurred_at", DESCENDING)],
         name="ix_inventory_movement_item_time",
     )
+
+    await db.admissions.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING)],
+        unique=True, partialFilterExpression={"status": "admitted"},
+        name="uq_one_active_admission_per_patient",
+    )
