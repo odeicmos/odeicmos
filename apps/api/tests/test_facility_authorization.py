@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import asyncio
 
 import pytest
 from fastapi import HTTPException
@@ -17,17 +18,16 @@ class FakeAssignments:
         return self.result
 
 
-@pytest.mark.asyncio
-async def test_facility_authorization_scopes_by_tenant_facility_and_issuer():
+def test_facility_authorization_scopes_by_tenant_facility_and_issuer():
     assignments = FakeAssignments({"role": "clinician"})
     request = SimpleNamespace(app=SimpleNamespace(
         state=SimpleNamespace(mongo_database=SimpleNamespace(role_assignments=assignments))
     ))
     principal = Principal(subject="sub-1", issuer="https://id.example", claims={})
 
-    role = await authorize_facility_access(
+    role = asyncio.run(authorize_facility_access(
         request, principal, "tenant-a", "facility-a", ["clinician"]
-    )
+    ))
 
     assert role == "clinician"
     assert assignments.query == {
@@ -40,8 +40,7 @@ async def test_facility_authorization_scopes_by_tenant_facility_and_issuer():
     }
 
 
-@pytest.mark.asyncio
-async def test_facility_authorization_denies_missing_assignment():
+def test_facility_authorization_denies_missing_assignment():
     assignments = FakeAssignments(None)
     request = SimpleNamespace(app=SimpleNamespace(
         state=SimpleNamespace(mongo_database=SimpleNamespace(role_assignments=assignments))
@@ -49,9 +48,9 @@ async def test_facility_authorization_denies_missing_assignment():
     principal = Principal(subject="sub-1", issuer="https://id.example", claims={})
 
     with pytest.raises(HTTPException) as exc:
-        await authorize_facility_access(
+        asyncio.run(authorize_facility_access(
             request, principal, "tenant-a", "facility-a", ["clinician"]
-        )
+        ))
     assert exc.value.status_code == 403
 
 
