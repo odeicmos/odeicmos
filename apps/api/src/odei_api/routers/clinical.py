@@ -70,6 +70,16 @@ class TriageCreate(BaseModel):
     height_cm: float | None = Field(default=None, gt=0, le=300)
 
 
+
+class TriageReviewCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    reviewed_acuity: int = Field(ge=1, le=5)
+    disposition: Literal["routine_queue", "urgent_review", "emergency_response", "referred"]
+    rationale: str = Field(min_length=5, max_length=2000)
+    override_reason: str | None = Field(default=None, max_length=1000)
+
 class ObservationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
@@ -245,7 +255,7 @@ async def create_triage(payload: TriageCreate, request: Request,
     triage_id, now = str(uuid4()), datetime.now(timezone.utc)
     record = payload.model_dump() | {
         "triage_id": triage_id, "patient_id": encounter["patient_id"],
-        "recorded_at": now, "recorded_by_issuer": principal.issuer,
+        "recorded_at": now, "review_status": "awaiting_review", "recorded_by_issuer": principal.issuer,
         "recorded_by_subject": principal.subject,
     }
     client = request.app.state.mongo_client
@@ -272,6 +282,8 @@ async def create_observation(payload: ObservationCreate, request: Request,
     }, projection={"_id": 1, "patient_id": 1})
     if encounter is None:
         raise HTTPException(status_code=404, detail="Open encounter not found")
+    if payload.effective_at is not None and (payload.effective_at.tzinfo is None or payload.effective_at.utcoffset() is None):
+        raise HTTPException(status_code=422, detail="effective_at must include timezone")
     observation_id, now = str(uuid4()), datetime.now(timezone.utc)
     record = payload.model_dump() | {
         "observation_id": observation_id, "patient_id": encounter["patient_id"],
@@ -408,3 +420,58 @@ async def amend_signed_clinical_note(
             )
     return {"note_id": note_id, "amendment_id": amendment_id,
             "version": version, "status": "signed", "created_at": now}
+
+@router.post("/triage/{triage_id}/review")
+async def review_triage(triage_id: str, payload: TriageReviewCreate, request: Request,
+                        principal: Principal = Depends(require_principal)):
+    """Qualified human review and disposition; no automated acuity decision is made."""
+    db = _db(request)
+    role = await authorize_facility_access(
+        request, principal, payload.tenant_id, payload.facility_id,
+        ["facility_admin", "nurse", "clinician"],
+    )
+    if payload.reviewed_acuity != 1 and payload.disposition == "emergency_response":
+        raise HTTPException(status_code=422, detail="Emergency response requires highest acuity (1)")
+    if payload.reviewed_acuity != 5 and payload.disposition == "routine_queue":
+        raise HTTPException(status_code=422, detail="Routine queue requires lowest acuity (5)")
+    now = datetime.now(timezone.utc)
+    async with await request.app.state.mongo_client.start_session() as session:
+        async with session.start_transaction():
+            triage = await db.triage_assessments.find_one({
+                "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "triage_id": triage_id, "review_status": "awaiting_review",
+            }, session=session)
+            if triage is None:
+                raise HTTPException(status_code=404, detail="Triage awaiting review not found")
+            if payload.reviewed_acuity != triage["acuity"] and not payload.override_reason:
+                raise HTTPException(status_code=422, detail="Acuity change requires an override reason")
+            changed = await db.triage_assessments.update_one(
+                {"_id": triage["_id"], "review_status": "awaiting_review"},
+                {"$set": {
+                    "review_status": "reviewed", "reviewed_acuity": payload.reviewed_acuity,
+                    "disposition": payload.disposition, "review_rationale": payload.rationale,
+                    "override_reason": payload.override_reason, "reviewed_at": now,
+                    "reviewer_issuer": principal.issuer, "reviewer_subject": principal.subject,
+                }}, session=session,
+            )
+            if changed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Triage review conflict; reload and retry")
+            priority = "emergency" if payload.disposition == "emergency_response" else (
+                "urgent" if payload.disposition == "urgent_review" else "routine"
+            )
+            await db.encounters.update_one(
+                {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                 "encounter_id": triage["encounter_id"], "status": "open"},
+                {"$set": {"priority": priority, "triage_reviewed_at": now}}, session=session,
+            )
+            await append_audit_event(
+                db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="triage.review", resource_type="triage_assessment",
+                resource_id=triage_id, tenant_id=payload.tenant_id, outcome="success",
+                metadata={"facility_id": payload.facility_id, "role": role,
+                          "disposition": payload.disposition,
+                          "reviewed_acuity": payload.reviewed_acuity}, session=session,
+            )
+    return {"triage_id": triage_id, "review_status": "reviewed",
+            "disposition": payload.disposition, "reviewed_at": now}
+
