@@ -185,3 +185,11 @@ Requires facility_admin or finance_officer. Records a payment against an issued 
 Open and close an operator cash session with an opening float and counted closing cash. Close computes expected cash from cash-method payment records and records the variance. The operator who opened the session must close it.
 
 **Accounting limitation:** this is not a complete accounting ledger. Chart of accounts, double-entry journal postings, taxes, discounts, refunds, voids, credit notes, receivables ageing, bank reconciliation, mobile-money settlement reconciliation, cashier shift handover, cash drawer attribution per payment, financial period close, audit export and statutory reporting remain unimplemented. Payment records are not yet linked to a session at receipt time; the cash-session aggregation is therefore a preliminary estimate, not a production-grade cash reconciliation. Do not use this as the sole financial book of record.
+
+
+## Procurement foundation
+
+- `POST /api/v1/procurement/purchase-orders` creates a facility-scoped purchase order using integer minor-unit costs.
+- `POST /api/v1/procurement/goods-receipts` records a receipt against an approved-for-receipt purchase order, prevents cumulative received quantities from exceeding the ordered line, and creates a traceable inventory lot.
+- Buyer and receiver role checks are separate. Goods receipt and lot creation share a MongoDB transaction and audit event.
+- This is not yet a full procurement ledger: supplier master-data verification, multi-level approvals, partial-order lifecycle closure, invoice matching, returns, recalls, stock valuation and independent stock movement ledger remain required. Do not use this slice as sole control for regulated medicines or live financial close.
