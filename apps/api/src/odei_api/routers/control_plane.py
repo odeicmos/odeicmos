@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pymongo.errors import DuplicateKeyError
 from odei_api.audit import append_audit_event
-from odei_api.schemas import OrganizationCreate, FacilityCreate
+from odei_api.schemas import TenantCreate, OrganizationCreate, FacilityCreate
 from odei_api.security import Principal, require_platform_admin
 
 router = APIRouter(prefix="/control-plane", tags=["control-plane"])
@@ -14,6 +14,28 @@ def database(request: Request):
     if db is None:
         raise HTTPException(status_code=503, detail="Database unavailable")
     return db
+
+
+@router.post("/tenants", status_code=status.HTTP_201_CREATED)
+async def create_tenant(
+    payload: TenantCreate, request: Request,
+    principal: Principal = Depends(require_platform_admin),
+):
+    db = database(request)
+    now = datetime.now(timezone.utc)
+    record = payload.model_dump() | {
+        "status": "active", "created_at": now, "created_by": principal.subject,
+    }
+    try:
+        await db.tenants.insert_one(record)
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=409, detail="Tenant already exists") from exc
+    await append_audit_event(
+        db, actor_id=principal.subject, action="tenant.create",
+        resource_type="tenant", resource_id=payload.tenant_id,
+        tenant_id=payload.tenant_id, outcome="success",
+    )
+    return {"tenant_id": payload.tenant_id, "status": "active"}
 
 
 @router.post("/organizations", status_code=status.HTTP_201_CREATED)
