@@ -206,3 +206,13 @@ The inpatient router provides:
 - `POST /inpatient/admissions/{admission_id}/discharge` — clinician/facility administrator records discharge and releases the bed.
 
 Bed occupancy transitions are performed in MongoDB transactions with conditional state updates. This is an initial ADT foundation: nursing task charts, medication administration, observation escalation, discharge medication reconciliation, bed cleaning/maintenance state, occupancy dashboards and integration testing remain required before operational use.
+
+
+## Insurance claim foundation
+
+- `POST /insurance/payers` — facility administrator configures a payer.
+- `POST /insurance/eligibility` — claims officer records eligibility evidence and its source reference.
+- `POST /insurance/claims` — claims officer submits a claim against an invoice and eligible coverage record.
+- `POST /insurance/claims/{claim_id}/decision` — records an accepted, partially accepted or rejected payer decision.
+
+Eligibility is recorded evidence, not a live payer verification integration. Claim adjudication is a manual workflow record; it does not post cash, settle an invoice, or create accounting journals. Remittance matching, denial/resubmission cycles, preauthorization, payer APIs and financial settlement controls remain outstanding.
