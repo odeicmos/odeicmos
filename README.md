@@ -103,3 +103,10 @@ pytest
 ```
 
 The readiness endpoint must remain not-ready until dependency checks for the database, identity provider and secret manager are implemented and verified.
+
+
+## Current backend increment
+
+The API now includes OIDC JWT verification (RS256/JWKS, issuer, audience and time claims), a platform-admin-only control-plane registry for tenants, organizations and facilities, facility role-assignment provisioning, transactional audit writes, MongoDB index migrations and schema tests. See the [control-plane API contract](docs/api/control-plane-v1.md) and [bootstrap runbook](docs/operations/control-plane-bootstrap-runbook.md).
+
+This remains an early M1 foundation: no identity provider or MongoDB deployment has been connected and verified; JWKS cache hardening, delegated administration, facility-role authorization middleware, role revocation/expiry and access reviews remain open. No patient-facing clinical endpoints are enabled.
