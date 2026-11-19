@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pymongo import ASCENDING
 from odei_api.audit import append_audit_event
 from odei_api.security import Principal, authorize_facility_access, require_principal
@@ -43,6 +43,29 @@ class DispenseRequest(BaseModel):
     tenant_id: str = Field(min_length=3, max_length=64)
     facility_id: str = Field(min_length=3, max_length=64)
 
+
+
+class MedicationAdministrationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    order_id: str = Field(min_length=1, max_length=64)
+    medication_code: str = Field(min_length=1, max_length=80)
+    action: str = Field(pattern=r"^(administered|withheld|refused)$")
+    administered_dose: str | None = Field(default=None, max_length=100)
+    route: str | None = Field(default=None, max_length=60)
+    quantity: int = Field(default=0, ge=0, le=10000)
+    reason: str | None = Field(default=None, max_length=1000)
+    idempotency_key: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_action_details(self):
+        if self.action == "administered":
+            if not self.administered_dose or not self.route or self.quantity <= 0 or self.reason:
+                raise ValueError("Administered doses require dose, route and positive quantity, without a withholding reason")
+        elif not self.reason or self.quantity != 0:
+            raise ValueError("Withheld/refused doses require a reason and zero administered quantity")
+        return self
 
 def _db(request: Request):
     db = getattr(request.app.state, "mongo_database", None)
@@ -182,3 +205,66 @@ async def dispense_medication_order(
         raise
     return {"order_id": order_id, "status": "dispensed",
             "allocations": allocations, "dispensed_at": now}
+
+
+@router.post("/administrations", status_code=status.HTTP_201_CREATED)
+async def record_medication_administration(
+    payload: MedicationAdministrationCreate, request: Request,
+    principal: Principal = Depends(require_principal),
+):
+    """Record the actual bedside administration decision; this does not prescribe or calculate doses."""
+    db = _db(request)
+    await authorize_facility_access(
+        request, principal, payload.tenant_id, payload.facility_id,
+        ["facility_admin", "nurse", "clinician"],
+    )
+    now, administration_id = datetime.now(timezone.utc), str(uuid4())
+    client = request.app.state.mongo_client
+    try:
+        async with await client.start_session() as session:
+            async with session.start_transaction():
+                order = await db.medication_orders.find_one({
+                    "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                    "order_id": payload.order_id, "status": "dispensed",
+                }, session=session)
+                if order is None:
+                    raise HTTPException(status_code=404, detail="Dispensed medication order not found")
+                prescribed = [line for line in order["lines"]
+                              if line["medication_code"] == payload.medication_code]
+                if len(prescribed) != 1:
+                    raise HTTPException(status_code=422, detail="Medication code must identify exactly one prescribed line")
+                if payload.action == "administered":
+                    dispensed_qty = sum(
+                        int(item["quantity"]) for item in order.get("dispense_allocations", [])
+                        if item["medication_code"] == payload.medication_code
+                    )
+                    previous = await db.medication_administrations.aggregate([
+                        {"$match": {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                                    "order_id": payload.order_id, "medication_code": payload.medication_code,
+                                    "action": "administered"}},
+                        {"$group": {"_id": None, "total": {"$sum": "$quantity"}}},
+                    ], session=session).to_list(length=1)
+                    already_administered = previous[0]["total"] if previous else 0
+                    if already_administered + payload.quantity > dispensed_qty:
+                        raise HTTPException(status_code=409, detail="Administration exceeds quantity dispensed")
+                record = payload.model_dump() | {
+                    "administration_id": administration_id, "patient_id": order["patient_id"],
+                    "encounter_id": order["encounter_id"], "prescribed_line": prescribed[0],
+                    "occurred_at": now, "recorded_by_issuer": principal.issuer,
+                    "recorded_by_subject": principal.subject,
+                }
+                await db.medication_administrations.insert_one(record, session=session)
+                await append_audit_event(
+                    db, actor_id=f"{principal.issuer}|{principal.subject}",
+                    action=f"medication.{payload.action}", resource_type="medication_administration",
+                    resource_id=administration_id, tenant_id=payload.tenant_id, outcome="success",
+                    metadata={"facility_id": payload.facility_id, "order_id": payload.order_id,
+                              "medication_code": payload.medication_code, "quantity": payload.quantity},
+                    session=session,
+                )
+    except Exception as exc:
+        if exc.__class__.__name__ == "DuplicateKeyError":
+            raise HTTPException(status_code=409, detail="Administration idempotency key already used") from exc
+        raise
+    return {"administration_id": administration_id, "order_id": payload.order_id,
+            "action": payload.action, "occurred_at": now}
