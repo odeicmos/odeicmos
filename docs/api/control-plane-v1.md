@@ -245,3 +245,12 @@ This is a controlled posting foundation, not a complete general ledger. It does 
 Requires facility_admin, nurse or clinician. Records an administered, withheld or refused dose against a dispensed medication order. Administered records require a dose, route and positive quantity; withheld/refused records require a reason and zero administered quantity. The order must contain exactly one matching medication line. Cumulative recorded administration quantity cannot exceed the quantity dispensed for that medication code. Each record has an idempotency key and an audit event.
 
 This is a medication administration record (MAR) capture foundation, not a medication safety engine. It does not validate the clinical appropriateness or timing of the dose, patient identity at bedside, allergy/interaction risks, weight/renal/hepatic dosing, infusion rate, barcode scanning, witness requirements, controlled-drug rules or local nursing policy. Those controls and end-to-end clinical validation are mandatory before live use.
+
+
+## Appointment desk foundation
+
+- `POST /appointments` — receptionist, clinician or facility administrator books an appointment for an active patient.
+- `POST /appointments/{appointment_id}/check-in` — reception/nursing marks arrival.
+- `POST /appointments/{appointment_id}/cancel` — authorized desk/clinical role records cancellation and reason.
+
+Practitioner overlap is checked for appointments with a named practitioner, but this first slice is not a full resource-capacity scheduler. It does not yet handle rooms/equipment, recurring schedules, holidays, waitlists, reminders, rescheduling, no-shows, referral-linked bookings or concurrency-safe slot reservations.
