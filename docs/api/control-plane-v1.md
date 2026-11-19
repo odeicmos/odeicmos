@@ -168,3 +168,20 @@ Requires facility_admin, vaccinator or nurse. Records a vaccine administration f
 Requires facility_admin, vaccinator, nurse or clinician. Records an adverse event associated with an immunization record, with description, severity, optional onset and outcome. The report and audit event are transactional.
 
 **Not yet implemented:** schedule/forecast engine, age- and risk-based eligibility, contraindication screening, dose interval validation, catch-up schedules, defaulter tracing, consent, cold-chain sensors and excursion management, stock issue/reconciliation, national DHIS2/HMIS submission, regulator reporting adapters, AEFI causality review and workflow, investigation/closure, and FHIR Immunization/AdverseEvent interoperability. This API records reported facts; it does not determine vaccine eligibility or clinical suitability.
+
+
+## Finance API — invoicing, receipts and cash sessions
+
+### `POST /api/v1/finance/invoices`
+
+Requires facility_admin or finance_officer. Creates an invoice for an active facility patient and optional encounter. Line quantities and unit prices are integer minor units; totals are calculated server-side with bounded integer arithmetic. Initial status is `issued`.
+
+### `POST /api/v1/finance/invoices/{invoice_id}/payments`
+
+Requires facility_admin or finance_officer. Records a payment against an issued or partially paid invoice, rejects payments above the remaining balance, and atomically updates paid/balance/status and inserts a receipt/payment record plus audit event. Currency is inherited from the invoice.
+
+### `POST /api/v1/finance/cash-sessions/open` and `POST /api/v1/finance/cash-sessions/{cash_session_id}/close`
+
+Open and close an operator cash session with an opening float and counted closing cash. Close computes expected cash from cash-method payment records and records the variance. The operator who opened the session must close it.
+
+**Accounting limitation:** this is not a complete accounting ledger. Chart of accounts, double-entry journal postings, taxes, discounts, refunds, voids, credit notes, receivables ageing, bank reconciliation, mobile-money settlement reconciliation, cashier shift handover, cash drawer attribution per payment, financial period close, audit export and statutory reporting remain unimplemented. Payment records are not yet linked to a session at receipt time; the cash-session aggregation is therefore a preliminary estimate, not a production-grade cash reconciliation. Do not use this as the sole financial book of record.
