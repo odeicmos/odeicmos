@@ -37,7 +37,7 @@ async def register_patient(
     }, projection={"_id": 0, "facility_id": 1})
     if facility is None:
         raise HTTPException(status_code=404, detail="Active facility not found")
-    if payload.date_of_birth and payload.date_of_birth.date() > datetime.now(timezone.utc).date():
+    if payload.date_of_birth and payload.date_of_birth > datetime.now(timezone.utc).date():
         raise HTTPException(status_code=422, detail="Date of birth cannot be in the future")
 
     patient_id = str(uuid4())
