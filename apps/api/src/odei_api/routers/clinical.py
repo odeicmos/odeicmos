@@ -39,6 +39,12 @@ class ClinicalNoteCreate(BaseModel):
     body: str = Field(min_length=1, max_length=20000)
 
 
+class NoteSign(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+
+
 class TriageCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
@@ -309,11 +315,9 @@ async def create_diagnosis(payload: DiagnosisCreate, request: Request,
 
 
 @router.post("/notes/{note_id}/sign")
-async def sign_clinical_note(note_id: str, payload: dict, request: Request,
+async def sign_clinical_note(note_id: str, payload: NoteSign, request: Request,
                              principal: Principal = Depends(require_principal)):
-    if set(payload) != {"tenant_id", "facility_id"}:
-        raise HTTPException(status_code=422, detail="Only tenant_id and facility_id are accepted")
-    tenant_id, facility_id = payload["tenant_id"], payload["facility_id"]
+    tenant_id, facility_id = payload.tenant_id, payload.facility_id
     db = _db(request)
     role = await authorize_facility_access(
         request, principal, tenant_id, facility_id,
