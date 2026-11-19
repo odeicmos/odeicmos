@@ -87,3 +87,19 @@ The application packages and deployment instructions will be added as implementa
 ## License and governance
 
 No license or regulatory certification is implied by this initial repository content. Licensing, ownership, contribution policy and release authority must be approved by OIPTECH / ODEI OS governance.
+
+
+## Engineering roadmap and API scaffold
+
+The seven approved engineering milestones and their exit gates are tracked in [the engineering roadmap](docs/operations/engineering-roadmap.md).
+
+The first FastAPI scaffold is under `apps/api/`. It currently provides process liveness and an intentionally negative readiness response. It does **not** yet provide authentication, MongoDB persistence, authorization, audit persistence or production-ready business endpoints. Those are the first M1 implementation tasks. Install the package with:
+
+```bash
+cd apps/api
+python -m pip install -e ".[dev]"
+uvicorn odei_api.main:app --reload
+pytest
+```
+
+The readiness endpoint must remain not-ready until dependency checks for the database, identity provider and secret manager are implemented and verified.
