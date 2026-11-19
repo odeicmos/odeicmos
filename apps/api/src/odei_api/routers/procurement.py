@@ -118,9 +118,22 @@ async def receive_goods(payload: GoodsReceiptCreate, request: Request,
             await db.inventory_lots.insert_one({
                 "lot_id": lot_id, "tenant_id": payload.tenant_id,
                 "facility_id": payload.facility_id, "item_code": payload.item_code,
-                "lot_number": payload.lot_number, "quantity_available": payload.quantity_received,
-                "unit_cost_minor": payload.unit_cost_minor, "expiry_date": payload.expiry_date,
+                "lot_number": payload.lot_number, "batch_number": payload.lot_number,
+                "item_code": payload.item_code, "medication_code": payload.item_code,
+                "quantity_available": payload.quantity_received,
+                "quantity_on_hand": payload.quantity_received,
+                "unit_cost_minor": payload.unit_cost_minor,
+                "expiry_date": payload.expiry_date, "expiry_at": payload.expiry_date,
                 "status": "active", "received_at": now, "receipt_id": receipt_id,
+            }, session=session)
+            await db.inventory_movements.insert_one({
+                "movement_id": str(uuid4()), "tenant_id": payload.tenant_id,
+                "facility_id": payload.facility_id, "item_code": payload.item_code,
+                "medication_code": payload.item_code, "lot_id": lot_id,
+                "movement_type": "goods_receipt", "quantity_delta": payload.quantity_received,
+                "unit_cost_minor": payload.unit_cost_minor, "source_id": receipt_id,
+                "occurred_at": now, "actor_issuer": principal.issuer,
+                "actor_subject": principal.subject,
             }, session=session)
             await append_audit_event(
                 db, actor_id=f"{principal.issuer}|{principal.subject}",
