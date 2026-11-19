@@ -182,8 +182,10 @@ async def create_shift(payload: ShiftCreate, request: Request, principal: Princi
             if staff is None:
                 raise HTTPException(status_code=404, detail="Active staff member not found")
             # Touch the staff row so concurrent roster writes for this person conflict at transaction commit.
-            await db.staff_members.update_one({"_id": staff["_id"], "status": "active"},
+            roster_lock = await db.staff_members.update_one({"_id": staff["_id"], "status": "active"},
                 {"$inc": {"roster_revision": 1}}, session=session)
+            if roster_lock.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Staff roster changed; retry")
             overlap = await db.staff_shifts.find_one({"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                 "staff_id": payload.staff_id, "status": "scheduled",
                 "starts_at": {"$lt": payload.ends_at}, "ends_at": {"$gt": payload.starts_at}}, session=session)
