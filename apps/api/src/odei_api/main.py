@@ -10,6 +10,7 @@ from odei_api.routers.pharmacy import router as pharmacy_router
 from odei_api.routers.laboratory import router as laboratory_router
 from odei_api.routers.immunization import router as immunization_router
 from odei_api.routers.finance import router as finance_router
+from odei_api.routers.procurement import router as procurement_router
 
 
 @asynccontextmanager
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(laboratory_router, prefix=settings.api_prefix)
     app.include_router(immunization_router, prefix=settings.api_prefix)
     app.include_router(finance_router, prefix=settings.api_prefix)
+    app.include_router(procurement_router, prefix=settings.api_prefix)
     return app
 
 
