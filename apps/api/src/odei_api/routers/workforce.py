@@ -35,6 +35,13 @@ class CredentialCreate(BaseModel):
     valid_until: date | None = None
     evidence_object_ref: str = Field(min_length=8, max_length=300)
 
+class StaffDeactivation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    rationale: str = Field(min_length=5, max_length=2000)
+
+
 class CredentialDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
@@ -118,7 +125,7 @@ async def decide_credential(credential_id: str, payload: CredentialDecision, req
     return {"credential_id": credential_id, "status": payload.decision, "decided_at": now}
 
 @router.post("/staff/{staff_id}/deactivate")
-async def deactivate_staff(staff_id: str, payload: CredentialDecision, request: Request,
+async def deactivate_staff(staff_id: str, payload: StaffDeactivation, request: Request,
                            principal: Principal = Depends(require_principal)):
     db = _db(request)
     await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, HR_ROLES)
