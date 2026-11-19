@@ -216,3 +216,12 @@ Bed occupancy transitions are performed in MongoDB transactions with conditional
 - `POST /insurance/claims/{claim_id}/decision` — records an accepted, partially accepted or rejected payer decision.
 
 Eligibility is recorded evidence, not a live payer verification integration. Claim adjudication is a manual workflow record; it does not post cash, settle an invoice, or create accounting journals. Remittance matching, denial/resubmission cycles, preauthorization, payer APIs and financial settlement controls remain outstanding.
+
+
+## Stock ledger alignment
+
+Goods receipts now create inventory lots with the shared pharmacy stock fields (`medication_code`, `batch_number`, `quantity_on_hand`, and `expiry_at`) as well as generic item identifiers. Pharmacy dispensing decrements the same lot balance and appends negative `inventory_movements`; receipt creates a positive movement. The ledger is a foundational event history only: enforce append-only permissions at the database layer, implement stock counts/adjustments/returns/recalls/quarantine/valuation, and reconcile lot balances to movement sums before live inventory use.
+
+## Clinical note lifecycle
+
+`POST /clinical/notes` creates a draft. `POST /clinical/notes/{note_id}/sign` records the author or authorized clinician/facility administrator signature with timestamp and audit event. Amendment, co-signature, correction/addendum, note templates and legal retention controls are not yet implemented.
