@@ -237,3 +237,16 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("invoice_id", ASCENDING), ("status", ASCENDING)],
         name="ix_insurance_claim_invoice_status",
     )
+
+    await db.inventory_movements.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("movement_id", ASCENDING)],
+        unique=True, name="uq_inventory_movement_scope_id",
+    )
+    await db.inventory_movements.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("lot_id", ASCENDING), ("occurred_at", ASCENDING)],
+        name="ix_inventory_movement_lot_time",
+    )
+    await db.inventory_movements.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("item_code", ASCENDING), ("occurred_at", DESCENDING)],
+        name="ix_inventory_movement_item_time",
+    )
