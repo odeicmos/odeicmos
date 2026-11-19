@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from odei_api.routers.clinical import EncounterCreate, ClinicalNoteCreate, CarePlanCreate
+from odei_api.routers.clinical import EncounterCreate, ClinicalNoteCreate, CarePlanCreate, ClinicalNoteAmendmentCreate
 
 
 def scope(**overrides):
@@ -66,3 +66,16 @@ def test_observation_and_diagnosis_schema_validation():
     with pytest.raises(ValidationError):
         DiagnosisCreate(**scope(encounter_id="enc-1", code_system="snomed",
             code="1", display="Example", unexpected="bad"))
+
+
+def test_signed_note_amendment_requires_reason_and_body():
+    payload = ClinicalNoteAmendmentCreate(
+        tenant_id="tenant-a", facility_id="facility-a",
+        reason="Correct transcription error", body="Corrected clinical text.",
+    )
+    assert payload.reason == "Correct transcription error"
+    with pytest.raises(ValidationError):
+        ClinicalNoteAmendmentCreate(
+            tenant_id="tenant-a", facility_id="facility-a",
+            reason="Fix", body="",
+        )
