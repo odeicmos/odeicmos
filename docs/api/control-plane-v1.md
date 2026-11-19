@@ -193,3 +193,16 @@ Open and close an operator cash session with an opening float and counted closin
 - `POST /api/v1/procurement/goods-receipts` records a receipt against an approved-for-receipt purchase order, prevents cumulative received quantities from exceeding the ordered line, and creates a traceable inventory lot.
 - Buyer and receiver role checks are separate. Goods receipt and lot creation share a MongoDB transaction and audit event.
 - This is not yet a full procurement ledger: supplier master-data verification, multi-level approvals, partial-order lifecycle closure, invoice matching, returns, recalls, stock valuation and independent stock movement ledger remain required. Do not use this slice as sole control for regulated medicines or live financial close.
+
+
+## OPD and inpatient workflow extensions
+
+The clinical router now includes facility-scoped triage assessments, coded observations and encounter diagnoses. Triage acuity is stored as a 1–5 input supplied by the authorized clinician/nurse; it is not an autonomous triage algorithm and must be interpreted under an approved facility protocol. Clinical notes are created as drafts, not silently treated as signed records.
+
+The inpatient router provides:
+- `POST /inpatient/beds` — facility administrator configures a ward bed.
+- `POST /inpatient/admissions` — clinician/facility administrator admits a patient against an open inpatient encounter and an available bed.
+- `POST /inpatient/admissions/{admission_id}/transfer` — nurse/facility administrator moves an active admission between beds.
+- `POST /inpatient/admissions/{admission_id}/discharge` — clinician/facility administrator records discharge and releases the bed.
+
+Bed occupancy transitions are performed in MongoDB transactions with conditional state updates. This is an initial ADT foundation: nursing task charts, medication administration, observation escalation, discharge medication reconciliation, bed cleaning/maintenance state, occupancy dashboards and integration testing remain required before operational use.
