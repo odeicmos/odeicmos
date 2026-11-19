@@ -4,7 +4,7 @@ from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pymongo.errors import DuplicateKeyError
 
 from odei_api.audit import append_audit_event
@@ -20,17 +20,21 @@ class AppointmentCreate(BaseModel):
     tenant_id: str = Field(min_length=3, max_length=64)
     facility_id: str = Field(min_length=3, max_length=64)
     patient_id: str = Field(min_length=1, max_length=64)
-    appointment_type: str = Field(min_length=2, max_length=100)
-    scheduled_start: datetime
-    scheduled_end: datetime
-    reason: str | None = Field(default=None, max_length=1000)
-    provider_subject: str | None = Field(default=None, max_length=200)
-    department_code: str | None = Field(default=None, max_length=64)
+    starts_at: datetime
+    ends_at: datetime
+    service_code: str = Field(min_length=1, max_length=80)
+    reason: str = Field(min_length=2, max_length=1000)
+    practitioner_subject: str | None = Field(default=None, max_length=200)
+    appointment_type: Literal["consultation", "review", "procedure", "immunization", "telehealth"] = "consultation"
 
-    @classmethod
-    def validate_schedule(cls, values):
-        return values
-
+    @model_validator(mode="after")
+    def validate_times(self):
+        for value in (self.starts_at, self.ends_at):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("Appointment times must include timezone")
+        if self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be after starts_at")
+        return self
 
 class CheckInRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -58,19 +62,16 @@ async def create_appointment(payload: AppointmentCreate, request: Request,
                              principal: Principal = Depends(require_principal)):
     db = _db(request)
     await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, DESK_ROLES)
-    if payload.scheduled_start.tzinfo is None or payload.scheduled_start.utcoffset() is None:
-        raise HTTPException(status_code=422, detail="scheduled_start must include a timezone")
-    if payload.scheduled_end.tzinfo is None or payload.scheduled_end.utcoffset() is None:
-        raise HTTPException(status_code=422, detail="scheduled_end must include a timezone")
-    if payload.scheduled_end <= payload.scheduled_start:
-        raise HTTPException(status_code=422, detail="scheduled_end must be after scheduled_start")
+    now = datetime.now(timezone.utc)
+    if payload.starts_at <= now:
+        raise HTTPException(status_code=422, detail="New appointments must start in the future")
     patient = await db.patients.find_one({
         "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
         "patient_id": payload.patient_id, "record_status": "active",
     }, projection={"_id": 1})
     if patient is None:
         raise HTTPException(status_code=404, detail="Active patient not found")
-    appointment_id, now = str(uuid4()), datetime.now(timezone.utc)
+    appointment_id = str(uuid4())
     record = payload.model_dump() | {
         "appointment_id": appointment_id, "status": "booked",
         "created_at": now, "created_by_issuer": principal.issuer,
@@ -79,6 +80,15 @@ async def create_appointment(payload: AppointmentCreate, request: Request,
     client = request.app.state.mongo_client
     async with await client.start_session() as session:
         async with session.start_transaction():
+            if payload.practitioner_subject:
+                conflict = await db.appointments.find_one({
+                    "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                    "practitioner_subject": payload.practitioner_subject,
+                    "status": {"$in": ["booked", "checked_in", "in_service"]},
+                    "starts_at": {"$lt": payload.ends_at}, "ends_at": {"$gt": payload.starts_at},
+                }, session=session, projection={"_id": 1})
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Practitioner has an overlapping appointment")
             await db.appointments.insert_one(record, session=session)
             await append_audit_event(
                 db, actor_id=f"{principal.issuer}|{principal.subject}",
@@ -108,7 +118,7 @@ async def check_in_appointment(appointment_id: str, payload: CheckInRequest,
                     raise HTTPException(status_code=404, detail="Booked appointment not found")
                 changed = await db.appointments.update_one(
                     {"_id": appointment["_id"], "status": "booked"},
-                    {"$set": {"status": "arrived", "checked_in_at": now}}, session=session,
+                    {"$set": {"status": "checked_in", "checked_in_at": now}}, session=session,
                 )
                 if changed.modified_count != 1:
                     raise HTTPException(status_code=409, detail="Appointment check-in conflict")
@@ -117,7 +127,7 @@ async def check_in_appointment(appointment_id: str, payload: CheckInRequest,
                     "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                     "patient_id": appointment["patient_id"], "status": "waiting",
                     "priority": "routine", "arrived_at": now,
-                    "department_code": appointment.get("department_code"),
+                    "department_code": appointment.get("service_code"),
                     "created_by_subject": principal.subject,
                 }, session=session)
                 await append_audit_event(
@@ -130,7 +140,7 @@ async def check_in_appointment(appointment_id: str, payload: CheckInRequest,
     except DuplicateKeyError as exc:
         raise HTTPException(status_code=409, detail="Appointment already has a queue entry") from exc
     return {"appointment_id": appointment_id, "queue_id": queue_id,
-            "appointment_status": "arrived", "queue_status": "waiting", "arrived_at": now}
+            "appointment_status": "checked_in", "queue_status": "waiting", "arrived_at": now}
 
 
 @router.post("/queue/{queue_id}/transition")
@@ -161,7 +171,7 @@ async def transition_queue_entry(queue_id: str, payload: QueueTransition,
             if payload.status == "in_service":
                 await db.appointments.update_one(
                     {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-                     "appointment_id": entry["appointment_id"], "status": "arrived"},
+                     "appointment_id": entry["appointment_id"], "status": "checked_in"},
                     {"$set": {"status": "in_service", "service_started_at": now}}, session=session,
                 )
             elif payload.status == "completed":
@@ -173,7 +183,7 @@ async def transition_queue_entry(queue_id: str, payload: QueueTransition,
             elif payload.status == "cancelled":
                 await db.appointments.update_one(
                     {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-                     "appointment_id": entry["appointment_id"], "status": {"$in": ["arrived", "in_service"]}},
+                     "appointment_id": entry["appointment_id"], "status": {"$in": ["checked_in", "in_service"]}},
                     {"$set": {"status": "cancelled", "cancelled_at": now,
                               "cancellation_reason": payload.reason}}, session=session,
                 )
