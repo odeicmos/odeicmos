@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pymongo.errors import DuplicateKeyError
 from odei_api.audit import append_audit_event
-from odei_api.schemas import TenantCreate, OrganizationCreate, FacilityCreate
+from odei_api.schemas import TenantCreate, OrganizationCreate, FacilityCreate, RoleAssignmentCreate
 from odei_api.security import Principal, require_platform_admin
 
 router = APIRouter(prefix="/control-plane", tags=["control-plane"])
@@ -94,3 +94,32 @@ async def create_facility(payload: FacilityCreate, request: Request,
     except DuplicateKeyError as exc:
         raise HTTPException(status_code=409, detail="Facility already exists") from exc
     return {"facility_id": payload.facility_id, "status": "active"}
+
+
+@router.post("/role-assignments", status_code=status.HTTP_201_CREATED)
+async def create_role_assignment(
+    payload: RoleAssignmentCreate, request: Request,
+    principal: Principal = Depends(require_platform_admin),
+):
+    db = database(request)
+    facility = await db.facilities.find_one({
+        "tenant_id": payload.tenant_id,
+        "facility_id": payload.facility_id,
+        "status": "active",
+    })
+    if not facility:
+        raise HTTPException(status_code=404, detail="Active facility not found")
+    now = datetime.now(timezone.utc)
+    record = payload.model_dump() | {
+        "status": "active", "created_at": now, "created_by": principal.subject,
+    }
+    try:
+        await _insert_with_audit(
+            request, "role_assignments", record, actor=principal.subject,
+            action="role_assignment.create", resource_type="role_assignment",
+            resource_id=f"{payload.user_id}:{payload.facility_id}:{payload.role}",
+            tenant_id=payload.tenant_id,
+        )
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=409, detail="Role assignment already exists") from exc
+    return {"status": "active", "role": payload.role, "facility_id": payload.facility_id}
