@@ -225,3 +225,16 @@ Goods receipts now create inventory lots with the shared pharmacy stock fields (
 ## Clinical note lifecycle
 
 `POST /clinical/notes` creates a draft. `POST /clinical/notes/{note_id}/sign` records the author or authorized clinician/facility administrator signature with timestamp and audit event. Amendment, co-signature, correction/addendum, note templates and legal retention controls are not yet implemented.
+
+
+## Double-entry accounting foundation
+
+### `POST /api/v1/accounting/accounts`
+
+Requires facility_admin. Creates a facility-scoped chart-of-accounts entry with a unique account code, account type, normal balance and optional active parent account. Account codes are not globally shared across facilities.
+
+### `POST /api/v1/accounting/journals`
+
+Requires facility_admin or finance_officer. Posts an immutable journal entry with a timezone-aware journal date, currency, source reference, idempotency key and at least two lines. Every line must be either a positive debit or a positive credit; total debits must equal total credits and all account codes must be active in the same tenant/facility. The journal and audit event are committed in one MongoDB transaction. A unique tenant/facility/idempotency-key index prevents duplicate posting.
+
+This is a controlled posting foundation, not a complete general ledger. It does not yet implement period locks, account balance snapshots, trial balance, subledger automation, invoice/payment-to-journal posting, tax rules, FX revaluation, reversals/corrections, approval workflows, bank/mobile-money reconciliation, or statutory financial statements. Do not treat it as a complete or independently audited accounting system. Database permissions and operational controls must prevent update/delete of posted journals; corrections should be implemented as separately authorized reversing entries.
