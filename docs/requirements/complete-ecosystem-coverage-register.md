@@ -128,3 +128,6 @@ No capability marked partial is approved for live patient care, medication use, 
 - Accounting now includes facility-scoped chart-of-accounts setup and balanced, idempotent double-entry journal posting with transactionally appended audit events. This is not a complete general ledger and database-level immutability still needs enforcement.
 - Pharmacy now includes an initial medication administration record endpoint for administered, withheld and refused doses against a dispensed order. It checks that the prescribed line is unambiguous and prevents cumulative recorded administration from exceeding dispensed quantity. It does not perform clinical dose validation, allergy/interaction checks or bedside identity/barcode verification.
 - New schema tests cover journal balance/line invariants and medication-administration decision fields. These tests are committed but have not been confirmed by a successful CI run.
+
+
+- Reception now has facility-scoped appointment creation, appointment check-in and waiting/in-service/completed/cancelled queue transitions. Provider/room scheduling conflicts and full queue routing are not yet implemented.
