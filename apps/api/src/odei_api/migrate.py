@@ -5,7 +5,7 @@ from odei_api.config import get_settings
 from odei_api.migrations.control_plane_indexes import apply_control_plane_indexes
 
 
-async def run() -> None:
+async def _run() -> None:
     settings = get_settings()
     if not settings.mongodb_uri:
         raise RuntimeError("ODEI_MONGODB_URI must be injected for migrations")
@@ -17,5 +17,9 @@ async def run() -> None:
         await client.close()
 
 
+def main() -> None:
+    asyncio.run(_run())
+
+
 if __name__ == "__main__":
-    asyncio.run(run())
+    main()
