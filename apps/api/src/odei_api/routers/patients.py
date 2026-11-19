@@ -1,5 +1,5 @@
 """Patient registration endpoints with facility-scoped access and audited writes."""
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -51,6 +51,8 @@ async def register_patient(
         "created_by_subject": principal.subject,
         "record_status": "active",
     }
+    if payload.date_of_birth is not None:
+        record["date_of_birth"] = datetime.combine(payload.date_of_birth, time.min, tzinfo=timezone.utc)
     try:
         client = request.app.state.mongo_client
         async with await client.start_session() as session:
