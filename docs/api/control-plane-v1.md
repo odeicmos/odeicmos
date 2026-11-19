@@ -123,3 +123,18 @@ Adds a bounded clinical note to an open encounter. Note types: assessment, progr
 Creates an active patient care plan with a title, one or more goals, one or more interventions, and an optional review due date and encounter link. Roles: facility_admin, clinician, nurse. Care-plan versioning, task assignment, outcome tracking, review/closure and patient-facing sharing remain future work.
 
 These endpoints are an initial API foundation only. They do not implement triage, admission/discharge/transfer, bed management, medication orders, laboratory orders, results, immunization schedules, billing, claims, procurement, inventory, offline synchronization or FHIR exchange. Clinical governance must approve the note-signing semantics and specialty workflows before live use.
+
+
+## Pharmacy API — initial ordering and dispensing slice
+
+### `POST /api/v1/pharmacy/orders`
+
+Requires facility_admin or clinician. Creates a pending medication order for an active patient and open encounter in the same facility. Each line requires a medication code, display name, dose, route, frequency and positive quantity; duration and instructions are optional. The order and audit event are transactional.
+
+### `POST /api/v1/pharmacy/orders/{order_id}/dispense`
+
+Requires facility_admin or pharmacist. Dispenses a pending order by allocating unexpired active stock lots in first-expiry-first-out (FEFO) order. Every lot decrement, order state transition, dispensing event and audit event occur in one MongoDB transaction. If any line cannot be fully supplied, the transaction is aborted; the order remains pending and stock decrements roll back.
+
+**Inventory lot contract:** dispensing expects `inventory_lots` documents to contain tenant_id, facility_id, medication_code, lot_id, batch_number, expiry_at, received_at, quantity_on_hand and status. Lot intake, stock adjustments, returns, quarantine, recalls, controlled medicines, unit conversions and cycle counts are not implemented in this slice.
+
+**Clinical safety limitation:** this is not yet a safe-to-deploy prescribing/dispensing system. Allergy and interaction checking, medication reconciliation, formulary controls, weight/renal/hepatic dosing, duplicate therapy, pregnancy checks, controlled-drug governance, pharmacist clinical verification, partial dispensing, substitutions, patient counselling, label generation and adverse-event reporting are not implemented. Do not use these endpoints for live patient care until those controls and clinical validation are complete.
