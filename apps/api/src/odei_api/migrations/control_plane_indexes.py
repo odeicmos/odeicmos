@@ -256,3 +256,25 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         unique=True, partialFilterExpression={"status": "admitted"},
         name="uq_one_active_admission_per_patient",
     )
+
+
+    await db.chart_of_accounts.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("account_code", ASCENDING)],
+        unique=True, name="uq_chart_account_facility_code",
+    )
+    await db.chart_of_accounts.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("account_type", ASCENDING), ("status", ASCENDING)],
+        name="ix_chart_account_type_status",
+    )
+    await db.journal_entries.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("journal_id", ASCENDING)],
+        unique=True, name="uq_journal_scope_id",
+    )
+    await db.journal_entries.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("idempotency_key", ASCENDING)],
+        unique=True, name="uq_journal_idempotency",
+    )
+    await db.journal_entries.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("journal_date", DESCENDING)],
+        name="ix_journal_facility_date",
+    )
