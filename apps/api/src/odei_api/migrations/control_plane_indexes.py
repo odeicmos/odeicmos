@@ -212,3 +212,28 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("transfer_id", ASCENDING)],
         unique=True, name="uq_admission_transfer_scope_id",
     )
+
+    await db.payers.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("payer_id", ASCENDING)],
+        unique=True, name="uq_payer_scope_id",
+    )
+    await db.payers.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("payer_code", ASCENDING)],
+        unique=True, name="uq_payer_facility_code",
+    )
+    await db.insurance_eligibility.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("eligibility_id", ASCENDING)],
+        unique=True, name="uq_insurance_eligibility_scope_id",
+    )
+    await db.insurance_eligibility.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING), ("checked_at", DESCENDING)],
+        name="ix_insurance_eligibility_patient_time",
+    )
+    await db.insurance_claims.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("claim_id", ASCENDING)],
+        unique=True, name="uq_insurance_claim_scope_id",
+    )
+    await db.insurance_claims.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("invoice_id", ASCENDING), ("status", ASCENDING)],
+        name="ix_insurance_claim_invoice_status",
+    )
