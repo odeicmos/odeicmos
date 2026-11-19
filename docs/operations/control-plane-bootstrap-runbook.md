@@ -44,6 +44,7 @@ All routes are under `/api/v1/control-plane` and require verified OIDC bearer to
 - POST `/tenants`
 - POST `/organizations`
 - POST `/facilities`
+- POST `/role-assignments`
 
 Registry writes and audit events use a MongoDB transaction. The database must support transactions. The tenant must exist before an organization can be created; the organization must exist before a facility can be created.
 
