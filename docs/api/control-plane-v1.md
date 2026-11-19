@@ -314,3 +314,23 @@ Cash payments require an open cash session owned by the authenticated operator a
 Requires facility_admin, nurse or clinician. A qualified staff member records reviewed acuity, a disposition (routine queue, urgent review, emergency response or referral), and clinical rationale. Changing the recorded acuity requires an override reason. The review updates the open encounter's operational priority in the same transaction and creates an audit event. The route intentionally does not infer acuity from vital signs or assume a universal 1–5 acuity direction; interpretation must follow the approved facility and country protocol. If the encounter is no longer open, the review is rejected.
 
 Clinical observations accept timezone-aware effective timestamps and reject future-dated measurements. This is data-integrity validation only; validated reference ranges, age/pregnancy-specific interpretation, early-warning scores and escalation pathways still require approved clinical governance.
+
+## Workforce registry and professional credential controls
+
+### `POST /api/v1/workforce/staff`
+
+Requires facility_admin or hr_manager. Creates a facility-scoped staff record with a facility staff code, display name, optional work contact details, employment type and start date. The initial record intentionally excludes national identity numbers, bank details and payroll secrets.
+
+### `POST /api/v1/workforce/credentials`
+
+Requires facility_admin or hr_manager. Submits a professional credential against an active staff record, including issuing authority, registration number, optional validity date and a private evidence-object reference. The evidence bytes must live in an access-controlled document store; the API record stores only its reference.
+
+### `POST /api/v1/workforce/credentials/{credential_id}/decision`
+
+Requires facility_admin or clinical_governance_officer. A different user from the submitter must verify or reject the credential with a reason. Expired credentials cannot be verified as current.
+
+### `POST /api/v1/workforce/staff/{staff_id}/deactivate`
+
+Requires facility_admin or hr_manager. Deactivates a staff record with a reason and audit event. This does not erase historical clinical authorship or audit records.
+
+This is workforce governance foundation only. Rostering, attendance, leave, payroll, benefits, training, occupational health, performance and jurisdiction-specific employment controls remain outstanding. Role assignment and facility clinical privileges must still be managed separately from the HR staff record.
