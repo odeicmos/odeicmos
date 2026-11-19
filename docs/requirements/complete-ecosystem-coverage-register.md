@@ -109,7 +109,7 @@ This is a conservative status snapshot of committed code, not a production-readi
 | Emergency | Partial | Encounter type and triage primitives only; emergency protocols, resuscitation, observation/escalation and transfer |
 | Nursing / procedures | Partial | Nursing note and inpatient transfer primitives; task lists, MAR, procedures, checklists and clinical observation escalation |
 | Appointments / referrals | Partial | Booking, check-in and cancellation across appointment/reception APIs; room/resource capacity, waitlists, referrals and reminders |
-| HR / payroll | Partial | Facility staff registry, credential submission and independent verification, staff deactivation; rota, attendance, leave, payroll and approvals |
+| HR / payroll | Partial | Facility staff registry, professional credential submission and independent verification, staff deactivation, future shift scheduling/cancellation; attendance, leave, payroll and approvals |
 | Facility / equipment | Not implemented | Departments, assets, maintenance, calibration, downtime and serviceability |
 | QA / safety | Not implemented | Incidents, complaints, audit programs, corrective actions and clinical governance |
 | Public health / HMIS | Not implemented | Aggregations, validated reporting, DHIS2/national adapters and submission reconciliation |
@@ -142,3 +142,5 @@ No capability marked partial is approved for live patient care, medication use, 
 - Observation capture now rejects naive/future effective timestamps. Clinical reference ranges, validated early-warning scores and age-/context-specific escalation remain unimplemented pending approved protocols.
 
 - Workforce governance now includes a facility-scoped staff register, professional credential submission, independent verification/rejection with rationale, expiry checks and audited staff deactivation. It does not yet manage rosters, attendance, leave or payroll; clinical privileges remain separate from HR status.
+
+- Workforce now includes a first roster workflow: future timezone-aware shifts, overlap checks, serialized per-staff roster writes, cancellation with reason and audit. It does not yet implement leave, swaps, attendance, staffing ratios or payroll.
