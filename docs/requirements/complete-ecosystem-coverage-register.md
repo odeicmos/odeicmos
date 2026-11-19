@@ -96,19 +96,19 @@ This is a conservative status snapshot of committed code, not a production-readi
 
 | Capability | Current code status | Important remaining work |
 |---|---|---|
-| Reception and queue | Partial | Appointment booking/check-in/cancellation; live arrival queue, routing and wait-time management |
+| Reception and queue | Partial | Facility-scoped appointment booking, check-in, queue transitions and transactional audit; live queue dashboard, walk-ins, triage priority and wait-time management |
 | Patient registration | Partial | MPI matching/merge, consent, identity verification, guardianship, duplicate review, offline |
 | OPD | Partial | Triage/observations/diagnoses/notes/care-plan foundation; full order, referral, follow-up and clinical decision support |
 | IPD / ADT | Partial | Beds, admissions, transfers, discharge; nursing charts, rounds, escalation and reconciliation |
 | Pharmacy | Partial | Medication orders, FEFO dispensing, stock movements and MAR capture for administered/withheld/refused doses; allergies, interactions, formulary, dose scheduling/safety, partial supply, controlled drugs, returns/recalls |
-| Procurement / inventory | Partial | Purchase orders, goods receipts, lots and stock movement events; supplier governance, approvals, stock counts, adjustments, valuation, returns and recalls |
+| Procurement / inventory | Partial | Supplier register, draft/submit/segregated purchase-order approval, goods receipts, lots and stock movement events; due diligence, quotations, stock counts, adjustments, valuation, returns and recalls |
 | Immunization | Partial | Administration and adverse-event report; schedule, eligibility, consent, cold-chain, follow-up, causality and national reporting |
 | Billing / cash | Partial | Invoices, payments, linked cash sessions, chart of accounts and balanced journal posting; automatic subledger posting, refunds, credit notes, tariffs, tax, reconciliation, period close and reporting |
 | Laboratory | Partial | Orders, specimen collection and preliminary results; accession, multiple containers, QC, verified release, critical-result escalation and LIS |
 | Insurance | Partial | Payers, recorded eligibility, claim submission and manual decision; preauthorization, payer integration, remittance, denial/resubmission and settlement |
 | Emergency | Partial | Encounter type and triage primitives only; emergency protocols, resuscitation, observation/escalation and transfer |
 | Nursing / procedures | Partial | Nursing note and inpatient transfer primitives; task lists, MAR, procedures, checklists and clinical observation escalation |
-| Appointments / referrals | Partial | Booking, check-in and cancellation; room/resource capacity, waitlists, referrals and reminders |
+| Appointments / referrals | Partial | Booking, check-in and cancellation across appointment/reception APIs; room/resource capacity, waitlists, referrals and reminders |
 | HR / payroll | Not implemented | Staff registry, credentials, rota, attendance, payroll and approvals |
 | Facility / equipment | Not implemented | Departments, assets, maintenance, calibration, downtime and serviceability |
 | QA / safety | Not implemented | Incidents, complaints, audit programs, corrective actions and clinical governance |
@@ -131,3 +131,8 @@ No capability marked partial is approved for live patient care, medication use, 
 
 
 - Reception now has facility-scoped appointment creation, appointment check-in and waiting/in-service/completed/cancelled queue transitions. Provider/room scheduling conflicts and full queue routing are not yet implemented.
+
+
+- Clinical documentation now supports append-only, separately signed amendments to signed notes, with reason, version counter, transactional audit event and unique amendment-version index. Legal retention, co-signature and late-entry policy remains to be approved.
+- Procurement now has a supplier register and segregated purchase-order lifecycle: draft, submit, independent approval and goods receipt only after approval. Competitive procurement, supplier due diligence and spend-limit controls remain outstanding.
+- Reception appointment creation now uses the shared appointment document fields and lifecycle, and the cash-session payment flow now serializes payment writes against session closure. These are code-level safeguards; concurrency integration tests and successful CI verification are still pending.
