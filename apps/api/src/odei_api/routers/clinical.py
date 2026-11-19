@@ -385,7 +385,7 @@ async def amend_signed_clinical_note(
             version = int(note.get("amendment_count", 0)) + 1
             changed = await db.clinical_notes.update_one(
                 {"_id": note["_id"], "status": "signed",
-                 "amendment_count": note.get("amendment_count", 0)},
+                 "$or": [{"amendment_count": note.get("amendment_count", 0)}, {"amendment_count": {"$exists": False}}]},
                 {"$inc": {"amendment_count": 1}, "$set": {"last_amended_at": now}},
                 session=session,
             )
