@@ -28,6 +28,14 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("user_issuer", ASCENDING), ("user_id", ASCENDING), ("facility_id", ASCENDING), ("role", ASCENDING)],
         unique=True, name="uq_scoped_role_assignment",
     )
+    await db.patients.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("medical_record_number", ASCENDING)],
+        unique=True, name="uq_patient_facility_mrn",
+    )
+    await db.patients.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("created_at", DESCENDING)],
+        name="ix_patient_facility_created",
+    )
     await db.audit_events.create_index(
         [("tenant_id", ASCENDING), ("occurred_at", DESCENDING)], name="ix_audit_tenant_time"
     )
