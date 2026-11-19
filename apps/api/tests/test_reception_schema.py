@@ -4,22 +4,28 @@ from pydantic import ValidationError
 from odei_api.routers.reception import AppointmentCreate, CheckInRequest, QueueTransition
 
 
-def test_appointment_requires_timezone_and_valid_interval_at_service_layer():
+def test_appointment_requires_timezone_and_valid_interval():
     payload = AppointmentCreate(
         tenant_id="tenant-a", facility_id="facility-a", patient_id="patient-a",
-        appointment_type="consultation",
-        scheduled_start="2026-11-20T09:00:00+03:00",
-        scheduled_end="2026-11-20T09:30:00+03:00",
+        service_code="OPD", reason="Consultation",
+        starts_at="2026-11-20T09:00:00+03:00",
+        ends_at="2026-11-20T09:30:00+03:00",
     )
-    assert payload.scheduled_end > payload.scheduled_start
-    # The route rejects naive timestamps and non-positive intervals before writing.
-    naive = AppointmentCreate(
-        tenant_id="tenant-a", facility_id="facility-a", patient_id="patient-a",
-        appointment_type="consultation",
-        scheduled_start="2026-11-20T09:00:00",
-        scheduled_end="2026-11-20T09:30:00",
-    )
-    assert naive.scheduled_start.tzinfo is None
+    assert payload.ends_at > payload.starts_at
+    with pytest.raises(ValidationError):
+        AppointmentCreate(
+            tenant_id="tenant-a", facility_id="facility-a", patient_id="patient-a",
+            service_code="OPD", reason="Consultation",
+            starts_at="2026-11-20T09:00:00",
+            ends_at="2026-11-20T09:30:00+03:00",
+        )
+    with pytest.raises(ValidationError):
+        AppointmentCreate(
+            tenant_id="tenant-a", facility_id="facility-a", patient_id="patient-a",
+            service_code="OPD", reason="Consultation",
+            starts_at="2026-11-20T09:30:00+03:00",
+            ends_at="2026-11-20T09:00:00+03:00",
+        )
 
 
 def test_check_in_request_does_not_accept_queue_transition_fields():
