@@ -163,6 +163,8 @@ async def decide_claim(claim_id: str, payload: ClaimDecision, request: Request,
         raise HTTPException(status_code=422, detail="Accepted claim must approve the full claimed amount")
     if payload.decision == "rejected" and payload.approved_amount_minor != 0:
         raise HTTPException(status_code=422, detail="Rejected claim must approve zero")
+    if payload.decision == "partially_accepted" and not 0 < payload.approved_amount_minor < claim["claimed_amount_minor"]:
+        raise HTTPException(status_code=422, detail="Partially accepted claim must approve a positive amount below the claim")
     now = datetime.now(timezone.utc)
     client = request.app.state.mongo_client
     async with await client.start_session() as session:
