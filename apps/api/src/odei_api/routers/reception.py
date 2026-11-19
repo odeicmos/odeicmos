@@ -32,6 +32,12 @@ class AppointmentCreate(BaseModel):
         return values
 
 
+class CheckInRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+
+
 class QueueTransition(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
@@ -85,7 +91,7 @@ async def create_appointment(payload: AppointmentCreate, request: Request,
 
 
 @router.post("/appointments/{appointment_id}/check-in", status_code=status.HTTP_201_CREATED)
-async def check_in_appointment(appointment_id: str, payload: QueueTransition,
+async def check_in_appointment(appointment_id: str, payload: CheckInRequest,
                                request: Request, principal: Principal = Depends(require_principal)):
     db = _db(request)
     await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, DESK_ROLES)
