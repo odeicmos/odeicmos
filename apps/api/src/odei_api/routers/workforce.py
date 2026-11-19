@@ -35,6 +35,25 @@ class CredentialCreate(BaseModel):
     valid_until: date | None = None
     evidence_object_ref: str = Field(min_length=8, max_length=300)
 
+class ShiftCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    staff_id: str = Field(min_length=1, max_length=64)
+    department_code: str = Field(min_length=1, max_length=64)
+    shift_type: Literal["day", "night", "on_call", "other"]
+    starts_at: datetime
+    ends_at: datetime
+
+    @classmethod
+    def validate_interval(cls, values):
+        return values
+
+class ShiftAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    reason: str = Field(min_length=5, max_length=1000)
 class StaffDeactivation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
@@ -146,3 +165,56 @@ async def deactivate_staff(staff_id: str, payload: StaffDeactivation, request: R
                 tenant_id=payload.tenant_id, outcome="success",
                 metadata={"facility_id": payload.facility_id}, session=session)
     return {"staff_id": staff_id, "status": "inactive", "deactivated_at": now}
+
+@router.post("/shifts", status_code=status.HTTP_201_CREATED)
+async def create_shift(payload: ShiftCreate, request: Request, principal: Principal = Depends(require_principal)):
+    db = _db(request)
+    await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, HR_ROLES)
+    if payload.starts_at.tzinfo is None or payload.starts_at.utcoffset() is None or payload.ends_at.tzinfo is None or payload.ends_at.utcoffset() is None:
+        raise HTTPException(status_code=422, detail="Shift times must include timezone")
+    if payload.ends_at <= payload.starts_at or payload.starts_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=422, detail="Shift must have a positive duration and start in the future")
+    now, shift_id = datetime.now(timezone.utc), str(uuid4())
+    async with await request.app.state.mongo_client.start_session() as session:
+        async with session.start_transaction():
+            staff = await db.staff_members.find_one({"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "staff_id": payload.staff_id, "status": "active"}, session=session)
+            if staff is None:
+                raise HTTPException(status_code=404, detail="Active staff member not found")
+            # Touch the staff row so concurrent roster writes for this person conflict at transaction commit.
+            await db.staff_members.update_one({"_id": staff["_id"], "status": "active"},
+                {"$inc": {"roster_revision": 1}}, session=session)
+            overlap = await db.staff_shifts.find_one({"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "staff_id": payload.staff_id, "status": "scheduled",
+                "starts_at": {"$lt": payload.ends_at}, "ends_at": {"$gt": payload.starts_at}}, session=session)
+            if overlap:
+                raise HTTPException(status_code=409, detail="Staff member already has an overlapping scheduled shift")
+            await db.staff_shifts.insert_one(payload.model_dump() | {"shift_id": shift_id, "status": "scheduled",
+                "created_at": now, "created_by_subject": principal.subject}, session=session)
+            await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="workforce.shift.create", resource_type="staff_shift", resource_id=shift_id,
+                tenant_id=payload.tenant_id, outcome="success",
+                metadata={"facility_id": payload.facility_id, "staff_id": payload.staff_id}, session=session)
+    return {"shift_id": shift_id, "status": "scheduled", "created_at": now}
+
+@router.post("/shifts/{shift_id}/cancel")
+async def cancel_shift(shift_id: str, payload: ShiftAction, request: Request, principal: Principal = Depends(require_principal)):
+    db = _db(request)
+    await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, HR_ROLES)
+    now = datetime.now(timezone.utc)
+    async with await request.app.state.mongo_client.start_session() as session:
+        async with session.start_transaction():
+            shift = await db.staff_shifts.find_one({"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "shift_id": shift_id, "status": "scheduled"}, session=session)
+            if shift is None:
+                raise HTTPException(status_code=404, detail="Scheduled shift not found")
+            changed = await db.staff_shifts.update_one({"_id": shift["_id"], "status": "scheduled"},
+                {"$set": {"status": "cancelled", "cancelled_at": now, "cancellation_reason": payload.reason,
+                    "cancelled_by_subject": principal.subject}}, session=session)
+            if changed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Shift state changed; retry")
+            await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="workforce.shift.cancel", resource_type="staff_shift", resource_id=shift_id,
+                tenant_id=payload.tenant_id, outcome="success",
+                metadata={"facility_id": payload.facility_id, "staff_id": shift["staff_id"]}, session=session)
+    return {"shift_id": shift_id, "status": "cancelled", "cancelled_at": now}
