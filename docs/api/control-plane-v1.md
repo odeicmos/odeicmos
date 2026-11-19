@@ -64,6 +64,7 @@ Request:
   "tenant_id": "tenant_example",
   "facility_id": "facility_kampala_01",
   "user_id": "oidc-subject",
+  "user_issuer": "https://identity.example.org/",
   "role": "clinician"
 }
 ```
@@ -80,7 +81,7 @@ Each registry insert and its audit event are written in one MongoDB transaction.
 - Role assignments are provisioned, but user self-service, approval/expiry/revocation workflows and access-review campaigns are not implemented.
 - No production identity provider has been connected or tested.
 - No MongoDB instance has been connected or tested by this repository change.
-- No endpoint exposes patient records or clinical actions in this increment.
+- Patient registration/read and the initial encounter, clinical-note and care-plan workflows are available; specialty workflows, full EMR, clinical decision support and production validation remain incomplete.
 
 
 ## Identity and facility authorization hardening
@@ -103,3 +104,22 @@ Requires a verified OIDC bearer token and an active facility role of `facility_a
 Requires an active facility role of `facility_admin`, `clinician`, `nurse`, `receptionist`, `auditor`, or `read_only`. The query is constrained by patient, tenant, facility, and active record status. A read audit event is appended.
 
 This is the first registration slice, not a complete electronic medical record. It intentionally does not yet implement duplicate-patient matching, merge workflows, consent/legal-basis records, guardianship, encounter documentation, clinical notes, diagnosis, allergies, medication history, MPI across facilities, patient self-service, or offline registration. Those require separate domain workflows, governance and tests. Production use also requires MongoDB replica-set transaction support, database-level least privilege, encryption/key management, backup verification and approved clinical/privacy processes.
+
+
+## Clinical workflow API — initial slice
+
+All endpoints require a verified OIDC bearer token and an active facility assignment. All identifiers and queries are scoped by tenant and facility; the API does not permit cross-facility patient or encounter lookup.
+
+### `POST /api/v1/clinical/encounters`
+
+Creates an open OPD, emergency, inpatient, procedure, immunization or telehealth encounter for an active patient in the same facility. Roles: facility_admin, clinician, nurse, receptionist. Priority is routine, urgent or emergency. The encounter and audit event are written transactionally.
+
+### `POST /api/v1/clinical/notes`
+
+Adds a bounded clinical note to an open encounter. Note types: assessment, progress, nursing, discharge or procedure. Roles: facility_admin, clinician, nurse. The initial implementation marks submitted notes signed and records the authenticated author; amendments, co-signatures, templates, terminology validation and signature policy are not yet implemented. Do not treat this as a validated medico-legal documentation workflow.
+
+### `POST /api/v1/clinical/care-plans`
+
+Creates an active patient care plan with a title, one or more goals, one or more interventions, and an optional review due date and encounter link. Roles: facility_admin, clinician, nurse. Care-plan versioning, task assignment, outcome tracking, review/closure and patient-facing sharing remain future work.
+
+These endpoints are an initial API foundation only. They do not implement triage, admission/discharge/transfer, bed management, medication orders, laboratory orders, results, immunization schedules, billing, claims, procurement, inventory, offline synchronization or FHIR exchange. Clinical governance must approve the note-signing semantics and specialty workflows before live use.
