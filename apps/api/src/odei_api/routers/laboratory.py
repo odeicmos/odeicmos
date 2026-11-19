@@ -153,11 +153,13 @@ async def record_lab_result(
     client = request.app.state.mongo_client
     async with await client.start_session() as session:
         async with session.start_transaction():
-            await db.lab_results.insert_one(record, session=session)
-            await db.lab_orders.update_one(
+            changed = await db.lab_orders.update_one(
                 {"_id": order["_id"], "status": "specimen_collected"},
                 {"$set": {"status": "result_preliminary", "latest_result_id": result_id}}, session=session,
             )
+            if changed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Order state changed; retry result recording")
+            await db.lab_results.insert_one(record, session=session)
             await _audit(db, session, principal, "lab_result.record", "lab_result", result_id,
                          payload.tenant_id, payload.facility_id)
     return {"result_id": result_id, "order_id": order_id, "status": "preliminary", "recorded_at": now}
