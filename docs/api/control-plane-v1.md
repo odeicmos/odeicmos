@@ -138,3 +138,20 @@ Requires facility_admin or pharmacist. Dispenses a pending order by allocating u
 **Inventory lot contract:** dispensing expects `inventory_lots` documents to contain tenant_id, facility_id, medication_code, lot_id, batch_number, expiry_at, received_at, quantity_on_hand and status. Lot intake, stock adjustments, returns, quarantine, recalls, controlled medicines, unit conversions and cycle counts are not implemented in this slice.
 
 **Clinical safety limitation:** this is not yet a safe-to-deploy prescribing/dispensing system. Allergy and interaction checking, medication reconciliation, formulary controls, weight/renal/hepatic dosing, duplicate therapy, pregnancy checks, controlled-drug governance, pharmacist clinical verification, partial dispensing, substitutions, patient counselling, label generation and adverse-event reporting are not implemented. Do not use these endpoints for live patient care until those controls and clinical validation are complete.
+
+
+## Laboratory API — initial order/specimen/result lifecycle
+
+### `POST /api/v1/laboratory/orders`
+
+Requires facility_admin or clinician. Creates a laboratory order linked to an active patient and open encounter in the same facility. Tests are supplied as a bounded list of local test codes/names and priority is routine, urgent or stat. The order is stored as `awaiting_specimen` and audited transactionally.
+
+### `POST /api/v1/laboratory/orders/{order_id}/specimens`
+
+Requires facility_admin, nurse or lab_scientist. Records one specimen against an order awaiting collection, including specimen type, optional container and collection site. The order transitions to `specimen_collected`. A unique order/specimen index prevents duplicate collection records.
+
+### `POST /api/v1/laboratory/orders/{order_id}/results`
+
+Requires facility_admin or lab_scientist. Records a preliminary result for an order with a collected specimen, including analyte, value, optional unit/reference range, interpretation and comment. Result and audit records are written transactionally.
+
+**Not yet implemented:** barcode labels, multiple specimen containers per order, accessioning, rejection/recollection, chain-of-custody events, analyzer/LIS integrations, validated test catalogue and units, reference-range rules by age/sex/pregnancy, delta checks, critical-result escalation/acknowledgement, pathologist verification, amended/final results, microbiology workflows, quality control, external lab referrals and FHIR DiagnosticReport/Observation exchange. Preliminary results must not be treated as verified clinical results.
