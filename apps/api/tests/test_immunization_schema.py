@@ -31,7 +31,7 @@ def test_adverse_event_requires_valid_severity_and_description():
         immunization_id="imm-1", description="Fever after vaccination",
         severity="non_serious",
     )
-    assert payload.status if hasattr(payload, "status") else payload.severity == "non_serious"
+    assert payload.severity == "non_serious"
     with pytest.raises(ValidationError):
         AdverseEventCreate(
             tenant_id="tenant-a", facility_id="facility-a",
