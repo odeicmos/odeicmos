@@ -6,6 +6,7 @@ from odei_api.config import get_settings
 from odei_api.routers.control_plane import router as control_plane_router
 from odei_api.routers.patients import router as patients_router
 from odei_api.routers.clinical import router as clinical_router
+from odei_api.routers.pharmacy import router as pharmacy_router
 
 
 @asynccontextmanager
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(control_plane_router, prefix=settings.api_prefix)
     app.include_router(patients_router, prefix=settings.api_prefix)
     app.include_router(clinical_router, prefix=settings.api_prefix)
+    app.include_router(pharmacy_router, prefix=settings.api_prefix)
     return app
 
 
