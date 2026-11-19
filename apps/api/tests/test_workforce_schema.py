@@ -60,3 +60,24 @@ def test_staff_deactivation_has_dedicated_schema():
             tenant_id="tenant-a", facility_id="facility-a",
             rationale="x", unexpected="field",
         )
+
+
+def test_shift_schema_rejects_unknown_fields_and_requires_timezone_at_service_layer():
+    from odei_api.routers.workforce import ShiftCreate, ShiftAction
+    shift = ShiftCreate(
+        tenant_id="tenant-a", facility_id="facility-a", staff_id="staff-a",
+        department_code="OPD", shift_type="day",
+        starts_at="2026-11-20T08:00:00+03:00",
+        ends_at="2026-11-20T17:00:00+03:00",
+    )
+    assert shift.ends_at > shift.starts_at
+    action = ShiftAction(
+        tenant_id="tenant-a", facility_id="facility-a",
+        reason="Staff member is unavailable.",
+    )
+    assert action.reason
+    with pytest.raises(ValidationError):
+        ShiftAction(
+            tenant_id="tenant-a", facility_id="facility-a",
+            reason="x", extra_field="no",
+        )
