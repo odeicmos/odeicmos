@@ -430,10 +430,6 @@ async def review_triage(triage_id: str, payload: TriageReviewCreate, request: Re
         request, principal, payload.tenant_id, payload.facility_id,
         ["facility_admin", "nurse", "clinician"],
     )
-    if payload.reviewed_acuity != 1 and payload.disposition == "emergency_response":
-        raise HTTPException(status_code=422, detail="Emergency response requires highest acuity (1)")
-    if payload.reviewed_acuity != 5 and payload.disposition == "routine_queue":
-        raise HTTPException(status_code=422, detail="Routine queue requires lowest acuity (5)")
     now = datetime.now(timezone.utc)
     async with await request.app.state.mongo_client.start_session() as session:
         async with session.start_transaction():
