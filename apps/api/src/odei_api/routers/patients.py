@@ -89,16 +89,24 @@ async def get_patient(
     principal: Principal = Depends(require_principal),
 ):
     db = _database(request)
-    await authorize_facility_access(
+    role = await authorize_facility_access(
         request, principal, tenant_id, facility_id,
-        ["facility_admin", "clinician", "nurse", "receptionist", "auditor", "read_only"],
+        ["facility_admin", "clinician", "nurse", "receptionist", "auditor"],
     )
+    projection = {"_id": 0}
+    if role == "auditor":
+        projection = {"_id": 0, "patient_id": 1, "medical_record_number": 1,
+                      "created_at": 1, "record_status": 1}
+    elif role == "receptionist":
+        projection = {"_id": 0, "patient_id": 1, "medical_record_number": 1,
+                      "legal_name": 1, "preferred_name": 1, "date_of_birth": 1,
+                      "phone_number": 1, "preferred_language": 1, "record_status": 1}
     patient = await db.patients.find_one({
         "patient_id": patient_id,
         "tenant_id": tenant_id,
         "facility_id": facility_id,
         "record_status": "active",
-    }, projection={"_id": 0})
+    }, projection=projection)
     if patient is None:
         raise HTTPException(status_code=404, detail="Patient not found")
     await append_audit_event(
