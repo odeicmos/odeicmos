@@ -67,6 +67,8 @@ async def book_appointment(payload: AppointmentCreate, request: Request,
     if patient is None:
         raise HTTPException(status_code=404, detail="Active patient not found")
     appointment_id, now = str(uuid4()), datetime.now(timezone.utc)
+    if payload.starts_at <= now:
+        raise HTTPException(status_code=422, detail="New appointments must start in the future")
     client = request.app.state.mongo_client
     async with await client.start_session() as session:
         async with session.start_transaction():
