@@ -186,14 +186,20 @@ async def discharge_patient(admission_id: str, payload: DischargeCreate, request
                 "status": "occupied", "current_admission_id": admission_id}, session=session)
             if bed is None:
                 raise HTTPException(status_code=409, detail="Assigned bed state is inconsistent")
-            await db.beds.update_one({"_id": bed["_id"], "status": "occupied",
+            released = await db.beds.update_one({"_id": bed["_id"], "status": "occupied",
                 "current_admission_id": admission_id},
                 {"$set": {"status": "available", "current_admission_id": None,
                           "updated_at": now}}, session=session)
-            await db.admissions.update_one({"_id": admission["_id"], "status": "admitted"},
+            discharged = await db.admissions.update_one({"_id": admission["_id"], "status": "admitted"},
                 {"$set": {"status": "discharged", "discharged_at": now,
                           "discharge_disposition": payload.discharge_disposition,
                           "discharge_summary": payload.summary}}, session=session)
+            if released.modified_count != 1 or discharged.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Discharge state changed; transaction rolled back")
+            await db.encounters.update_one({"tenant_id": payload.tenant_id,
+                "facility_id": payload.facility_id, "encounter_id": admission["encounter_id"],
+                "status": "open"}, {"$set": {"status": "closed", "ended_at": now,
+                "discharge_disposition": payload.discharge_disposition}}, session=session)
             await _audit(db, session, principal, "inpatient.discharge", "admission", admission_id,
                          payload.tenant_id, payload.facility_id)
     return {"admission_id": admission_id, "status": "discharged", "discharged_at": now}
