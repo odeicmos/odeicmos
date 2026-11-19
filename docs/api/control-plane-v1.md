@@ -254,3 +254,20 @@ This is a medication administration record (MAR) capture foundation, not a medic
 - `POST /appointments/{appointment_id}/cancel` — authorized desk/clinical role records cancellation and reason.
 
 Practitioner overlap is checked for appointments with a named practitioner, but this first slice is not a full resource-capacity scheduler. It does not yet handle rooms/equipment, recurring schedules, holidays, waitlists, reminders, rescheduling, no-shows, referral-linked bookings or concurrency-safe slot reservations.
+
+
+## Reception appointments and queue
+
+### `POST /api/v1/reception/appointments`
+
+Requires facility_admin or receptionist. Creates an appointment for an active patient in the facility with a timezone-aware start/end, appointment type and optional reason, provider subject and department code. End must be later than start. This initial workflow does not yet reserve provider/room capacity or detect overlapping bookings.
+
+### `POST /api/v1/reception/appointments/{appointment_id}/check-in`
+
+Requires facility_admin or receptionist. Atomically transitions a booked appointment to arrived and creates one waiting queue entry. A unique appointment-to-queue index prevents duplicate check-in.
+
+### `POST /api/v1/reception/queue/{queue_id}/transition`
+
+Requires facility_admin, receptionist, nurse or clinician. Moves a waiting entry to in_service or cancelled, or an in_service entry to completed or cancelled. The queue and appointment lifecycle are updated together where applicable and audited transactionally.
+
+The queue is a first operational slice, not a full scheduling/flow engine. Provider calendars, capacity, walk-in intake, triage-based priority, multi-department routing, referrals, wait-time service levels, no-show processing, patient notifications and queue dashboards remain outstanding.
