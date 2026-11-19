@@ -12,6 +12,7 @@ from odei_api.routers.immunization import router as immunization_router
 from odei_api.routers.finance import router as finance_router
 from odei_api.routers.procurement import router as procurement_router
 from odei_api.routers.inpatient import router as inpatient_router
+from odei_api.routers.insurance import router as insurance_router
 
 
 @asynccontextmanager
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(finance_router, prefix=settings.api_prefix)
     app.include_router(procurement_router, prefix=settings.api_prefix)
     app.include_router(inpatient_router, prefix=settings.api_prefix)
+    app.include_router(insurance_router, prefix=settings.api_prefix)
     return app
 
 
