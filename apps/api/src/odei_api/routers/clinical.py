@@ -285,6 +285,8 @@ async def create_observation(payload: ObservationCreate, request: Request,
     if payload.effective_at is not None and (payload.effective_at.tzinfo is None or payload.effective_at.utcoffset() is None):
         raise HTTPException(status_code=422, detail="effective_at must include timezone")
     observation_id, now = str(uuid4()), datetime.now(timezone.utc)
+    if payload.effective_at is not None and payload.effective_at > now:
+        raise HTTPException(status_code=422, detail="effective_at cannot be in the future")
     record = payload.model_dump() | {
         "observation_id": observation_id, "patient_id": encounter["patient_id"],
         "effective_at": payload.effective_at or now, "recorded_at": now,
@@ -455,11 +457,13 @@ async def review_triage(triage_id: str, payload: TriageReviewCreate, request: Re
             priority = "emergency" if payload.disposition == "emergency_response" else (
                 "urgent" if payload.disposition == "urgent_review" else "routine"
             )
-            await db.encounters.update_one(
+            encounter_changed = await db.encounters.update_one(
                 {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                  "encounter_id": triage["encounter_id"], "status": "open"},
                 {"$set": {"priority": priority, "triage_reviewed_at": now}}, session=session,
             )
+            if encounter_changed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Encounter is no longer open; triage review was not applied")
             await append_audit_event(
                 db, actor_id=f"{principal.issuer}|{principal.subject}",
                 action="triage.review", resource_type="triage_assessment",
