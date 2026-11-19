@@ -139,7 +139,7 @@ async def transition_queue_entry(queue_id: str, payload: QueueTransition,
     db = _db(request)
     await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, QUEUE_ROLES)
     now = datetime.now(timezone.utc)
-    allowed = {"waiting": {"in_service", "cancelled"}, "in_service": {"waiting", "completed", "cancelled"}}
+    allowed = {"waiting": {"in_service", "cancelled"}, "in_service": {"completed", "cancelled"}}
     async with await request.app.state.mongo_client.start_session() as session:
         async with session.start_transaction():
             entry = await db.queue_entries.find_one({
@@ -169,6 +169,13 @@ async def transition_queue_entry(queue_id: str, payload: QueueTransition,
                     {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                      "appointment_id": entry["appointment_id"], "status": "in_service"},
                     {"$set": {"status": "completed", "completed_at": now}}, session=session,
+                )
+            elif payload.status == "cancelled":
+                await db.appointments.update_one(
+                    {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                     "appointment_id": entry["appointment_id"], "status": {"$in": ["arrived", "in_service"]}},
+                    {"$set": {"status": "cancelled", "cancelled_at": now,
+                              "cancellation_reason": payload.reason}}, session=session,
                 )
             await append_audit_event(
                 db, actor_id=f"{principal.issuer}|{principal.subject}",
