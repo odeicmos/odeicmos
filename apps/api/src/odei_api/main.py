@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title=settings.app_name, version="0.3.0",
+        title=settings.app_name, version="0.4.0",
         description="ODEI Clinic OS control-plane API. Business routes require verified OIDC identity.",
         docs_url=None if settings.environment == "production" else "/docs",
         redoc_url=None, lifespan=lifespan,
