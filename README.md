@@ -21,7 +21,7 @@ ODEI Clinic OS coordinates patient access, longitudinal clinical care, diagnosti
 9. Laboratory and diagnostics
 10. Insurance and claims
 
-Shared platform capabilities include identity, tenant/facility policy, workflow orchestration, audit, terminology, notifications, interoperability, reporting and controlled AI assistance.
+Shared platform capabilities include identity, tenant/facility policy, workflow orchestration, audit, terminology, notifications, interoperability, reporting and controlled AI assistance. The ecosystem also has a privileged **Master Admin Console (MAC)** for global configuration and deployment governance, and a **Master Admin Dashboard (MAD)** for cross-ecosystem observability and management intelligence.
 
 ## Architecture baseline
 
@@ -33,6 +33,15 @@ Shared platform capabilities include identity, tenant/facility policy, workflow 
 - Interoperability: pinned HL7 FHIR profiles selected per partner/country; national interfaces are versioned adapters.
 - Connectivity: online-authoritative operation plus explicitly classified offline capture and reconciliation.
 - Deployment: multi-tenant SaaS, dedicated organization, national/regional and self-hosted/hybrid profiles.
+
+## Master control plane: MAC and MAD
+
+- MAC is the privileged control plane for tenants, facilities, country profiles, environment metadata, secret references, hosting providers, deployment targets, releases, integrations, security policy and infrastructure operations.
+- MAD is the read-optimized operational dashboard for ecosystem health, deployments, provider status, integration failures, security alerts, capacity and approved aggregate metrics.
+- Control-plane access is separate from tenant clinical access. Global deployment authority does not grant default access to patient records.
+- Secret values are write-only to the approved secret manager/provider; the application stores references and metadata, never plaintext production secrets.
+- Production redeployments require MFA, policy checks, approval, immutable release plans, health verification and an auditable rollback path.
+- Provider adapters must discover actual plan capabilities. Vercel, Namecheap shared hosting, Namecheap VPS, Bluehost shared hosting and Bluehost VPS are not interchangeable runtime targets.
 
 ## Non-negotiable safety and integrity rules
 
