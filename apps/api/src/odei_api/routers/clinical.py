@@ -39,6 +39,14 @@ class ClinicalNoteCreate(BaseModel):
     body: str = Field(min_length=1, max_length=20000)
 
 
+class ClinicalNoteAmendmentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    reason: str = Field(min_length=5, max_length=1000)
+    body: str = Field(min_length=1, max_length=20000)
+
+
 class NoteSign(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
@@ -352,3 +360,51 @@ async def sign_clinical_note(note_id: str, payload: NoteSign, request: Request,
                 session=session,
             )
     return {"note_id": note_id, "status": "signed", "signed_at": now}
+
+
+@router.post("/notes/{note_id}/amendments", status_code=status.HTTP_201_CREATED)
+async def amend_signed_clinical_note(
+    note_id: str, payload: ClinicalNoteAmendmentCreate, request: Request,
+    principal: Principal = Depends(require_principal),
+):
+    """Append a separately signed correction; never rewrite the original signed note."""
+    db = _db(request)
+    role = await authorize_facility_access(
+        request, principal, payload.tenant_id, payload.facility_id,
+        ["facility_admin", "clinician"],
+    )
+    amendment_id, now = str(uuid4()), datetime.now(timezone.utc)
+    async with await request.app.state.mongo_client.start_session() as session:
+        async with session.start_transaction():
+            note = await db.clinical_notes.find_one({
+                "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "note_id": note_id, "status": "signed",
+            }, session=session)
+            if note is None:
+                raise HTTPException(status_code=404, detail="Signed clinical note not found")
+            version = int(note.get("amendment_count", 0)) + 1
+            changed = await db.clinical_notes.update_one(
+                {"_id": note["_id"], "status": "signed",
+                 "amendment_count": note.get("amendment_count", 0)},
+                {"$inc": {"amendment_count": 1}, "$set": {"last_amended_at": now}},
+                session=session,
+            )
+            if changed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Note amendment conflict; reload and retry")
+            await db.clinical_note_amendments.insert_one({
+                "amendment_id": amendment_id, "note_id": note_id,
+                "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "patient_id": note["patient_id"], "encounter_id": note["encounter_id"],
+                "version": version, "reason": payload.reason, "body": payload.body,
+                "created_at": now, "author_issuer": principal.issuer,
+                "author_subject": principal.subject, "status": "signed",
+            }, session=session)
+            await append_audit_event(
+                db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="clinical_note.amend", resource_type="clinical_note",
+                resource_id=note_id, tenant_id=payload.tenant_id, outcome="success",
+                metadata={"facility_id": payload.facility_id, "amendment_id": amendment_id,
+                          "version": version, "role": role}, session=session,
+            )
+    return {"note_id": note_id, "amendment_id": amendment_id,
+            "version": version, "status": "signed", "created_at": now}
