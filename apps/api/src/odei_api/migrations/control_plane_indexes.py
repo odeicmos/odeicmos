@@ -312,3 +312,17 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         unique=True, partialFilterExpression={"status": "open"},
         name="uq_one_open_cash_session_per_operator",
     )
+
+
+    await db.suppliers.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("supplier_id", ASCENDING)],
+        unique=True, name="uq_supplier_scope_id",
+    )
+    await db.suppliers.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("supplier_code", ASCENDING)],
+        unique=True, name="uq_supplier_facility_code",
+    )
+    await db.purchase_orders.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)],
+        name="ix_purchase_order_status_time",
+    )
