@@ -155,3 +155,16 @@ Requires facility_admin, nurse or lab_scientist. Records one specimen against an
 Requires facility_admin or lab_scientist. Records a preliminary result for an order with a collected specimen, including analyte, value, optional unit/reference range, interpretation and comment. Result and audit records are written transactionally.
 
 **Not yet implemented:** barcode labels, multiple specimen containers per order, accessioning, rejection/recollection, chain-of-custody events, analyzer/LIS integrations, validated test catalogue and units, reference-range rules by age/sex/pregnancy, delta checks, critical-result escalation/acknowledgement, pathologist verification, amended/final results, microbiology workflows, quality control, external lab referrals and FHIR DiagnosticReport/Observation exchange. Preliminary results must not be treated as verified clinical results.
+
+
+## Immunization API — administration and adverse-event reporting
+
+### `POST /api/v1/immunization/administrations`
+
+Requires facility_admin, vaccinator or nurse. Records a vaccine administration for an active patient in the facility, including vaccine code/name, dose number, administration time, batch, expiry, quantity and route. An optional encounter must belong to the same patient and facility. The API rejects future administration times and batches expired at the recorded administration time. Administration and audit records are transactional.
+
+### `POST /api/v1/immunization/adverse-events`
+
+Requires facility_admin, vaccinator, nurse or clinician. Records an adverse event associated with an immunization record, with description, severity, optional onset and outcome. The report and audit event are transactional.
+
+**Not yet implemented:** schedule/forecast engine, age- and risk-based eligibility, contraindication screening, dose interval validation, catch-up schedules, defaulter tracing, consent, cold-chain sensors and excursion management, stock issue/reconciliation, national DHIS2/HMIS submission, regulator reporting adapters, AEFI causality review and workflow, investigation/closure, and FHIR Immunization/AdverseEvent interoperability. This API records reported facts; it does not determine vaccine eligibility or clinical suitability.
