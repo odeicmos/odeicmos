@@ -35,3 +35,15 @@ class TenantCreate(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     deployment_model: Literal["multi_tenant_saas", "dedicated", "self_hosted", "hybrid"]
     country_code: str = Field(min_length=2, max_length=2, pattern=r"^[A-Z]{2}$")
+
+
+class RoleAssignmentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    user_id: str = Field(min_length=1, max_length=200)
+    role: Literal[
+        "facility_admin", "clinician", "nurse", "pharmacist", "lab_scientist",
+        "vaccinator", "receptionist", "finance_officer", "procurement_officer",
+        "claims_officer", "auditor", "read_only"
+    ]
