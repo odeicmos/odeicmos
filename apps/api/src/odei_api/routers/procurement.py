@@ -123,7 +123,7 @@ async def receive_goods(payload: GoodsReceiptCreate, request: Request,
                 "quantity_available": payload.quantity_received,
                 "quantity_on_hand": payload.quantity_received,
                 "unit_cost_minor": payload.unit_cost_minor,
-                "expiry_date": payload.expiry_date, "expiry_at": payload.expiry_date,
+                "expiry_date": payload.expiry_date, "expiry_at": payload.expiry_date or datetime.max.replace(tzinfo=timezone.utc),
                 "status": "active", "received_at": now, "receipt_id": receipt_id,
             }, session=session)
             await db.inventory_movements.insert_one({
