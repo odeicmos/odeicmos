@@ -90,3 +90,16 @@ Role assignments identify a user by the pair `user_issuer` and `user_id` (OIDC i
 The verifier rejects non-RS256 algorithms, requires standard identity claims, refreshes JWKS once when a key identifier is not found, and distinguishes identity-provider/JWKS unavailability (503) from invalid credentials (401). JWKS is still cached only in process memory without a bounded TTL; production deployment must add a bounded cache and operational key-rotation monitoring.
 
 **Migration note:** existing role-assignment records must be backfilled with the correct trusted OIDC issuer before enabling issuer-scoped authorization. Do not infer an issuer from a user-supplied value. Apply the revised index through a controlled migration after reviewing existing index definitions and duplicate records.
+
+
+## Patient registration API (initial facility workflow)
+
+### `POST /api/v1/patients`
+
+Requires a verified OIDC bearer token and an active facility role of `facility_admin`, `clinician`, `nurse`, or `receptionist`. The request includes tenant and facility scope, a facility medical-record number, legal name, and optional preferred name, date of birth, sex-at-birth marker, phone number, and preferred language. Unknown fields are rejected. The medical-record number is unique within a tenant/facility pair. The write and its audit event are committed in one MongoDB transaction.
+
+### `GET /api/v1/patients/{patient_id}?tenant_id=...&facility_id=...`
+
+Requires an active facility role of `facility_admin`, `clinician`, `nurse`, `receptionist`, `auditor`, or `read_only`. The query is constrained by patient, tenant, facility, and active record status. A read audit event is appended.
+
+This is the first registration slice, not a complete electronic medical record. It intentionally does not yet implement duplicate-patient matching, merge workflows, consent/legal-basis records, guardianship, encounter documentation, clinical notes, diagnosis, allergies, medication history, MPI across facilities, patient self-service, or offline registration. Those require separate domain workflows, governance and tests. Production use also requires MongoDB replica-set transaction support, database-level least privilege, encryption/key management, backup verification and approved clinical/privacy processes.
