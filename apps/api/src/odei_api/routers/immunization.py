@@ -4,7 +4,7 @@ from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from odei_api.audit import append_audit_event
 from odei_api.security import Principal, authorize_facility_access, require_principal
 
@@ -29,6 +29,13 @@ class ImmunizationCreate(BaseModel):
     route: str = Field(min_length=1, max_length=60)
     site: str | None = Field(default=None, max_length=100)
 
+    @field_validator("administered_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("administered_at must include a timezone")
+        return value
+
 
 class AdverseEventCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -39,6 +46,13 @@ class AdverseEventCreate(BaseModel):
     severity: Literal["non_serious", "serious", "life_threatening", "fatal"]
     onset_at: datetime | None = None
     outcome: str | None = Field(default=None, max_length=500)
+
+    @field_validator("onset_at")
+    @classmethod
+    def require_timezone_when_present(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("onset_at must include a timezone")
+        return value
 
 
 def _db(request: Request):
