@@ -117,14 +117,15 @@ async def dispense_medication_order(
                         "tenant_id": payload.tenant_id,
                         "facility_id": payload.facility_id,
                         "medication_code": line["medication_code"],
-                        "status": "active", "expiry_at": {"$gt": now},
-                        "quantity_on_hand": {"$gt": 0},
+                        "status": "active", "quantity_on_hand": {"$gt": 0},
+                        "$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": {"$exists": False}}],
                     }, session=session).sort([("expiry_at", ASCENDING), ("received_at", ASCENDING)])
                     async for lot in lots:
                         take = min(remaining, int(lot["quantity_on_hand"]))
                         changed = await db.inventory_lots.update_one({
                             "_id": lot["_id"], "quantity_on_hand": {"$gte": take},
-                            "status": "active", "expiry_at": {"$gt": now},
+                            "status": "active",
+                            "$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": {"$exists": False}}],
                         }, {"$inc": {"quantity_on_hand": -take}}, session=session)
                         if changed.modified_count != 1:
                             continue
@@ -151,13 +152,25 @@ async def dispense_medication_order(
                 }}, session=session)
                 if result.modified_count != 1:
                     raise HTTPException(status_code=409, detail="Medication order was already processed")
+                dispense_id = str(uuid4())
                 await db.dispensing_events.insert_one({
-                    "dispense_id": str(uuid4()), "order_id": order_id,
+                    "dispense_id": dispense_id, "order_id": order_id,
                     "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                     "patient_id": order["patient_id"], "allocations": allocations,
                     "occurred_at": now, "actor_issuer": principal.issuer,
                     "actor_subject": principal.subject,
                 }, session=session)
+                for allocation in allocations:
+                    await db.inventory_movements.insert_one({
+                        "movement_id": str(uuid4()), "tenant_id": payload.tenant_id,
+                        "facility_id": payload.facility_id,
+                        "item_code": allocation["medication_code"],
+                        "medication_code": allocation["medication_code"],
+                        "lot_id": allocation["lot_id"], "movement_type": "dispensing",
+                        "quantity_delta": -allocation["quantity"], "source_id": dispense_id,
+                        "occurred_at": now, "actor_issuer": principal.issuer,
+                        "actor_subject": principal.subject,
+                    }, session=session)
                 await append_audit_event(
                     db, actor_id=f"{principal.issuer}|{principal.subject}",
                     action="medication_order.dispense", resource_type="medication_order",
