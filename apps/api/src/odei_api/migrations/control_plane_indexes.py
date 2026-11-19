@@ -25,7 +25,7 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("issuer", ASCENDING), ("subject", ASCENDING)], unique=True, name="uq_oidc_subject"
     )
     await db.role_assignments.create_index(
-        [("tenant_id", ASCENDING), ("user_id", ASCENDING), ("facility_id", ASCENDING), ("role", ASCENDING)],
+        [("tenant_id", ASCENDING), ("user_issuer", ASCENDING), ("user_id", ASCENDING), ("facility_id", ASCENDING), ("role", ASCENDING)],
         unique=True, name="uq_scoped_role_assignment",
     )
     await db.audit_events.create_index(
