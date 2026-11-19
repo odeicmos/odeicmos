@@ -27,3 +27,11 @@ class RegistryRecord(BaseModel):
     id: str
     status: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class TenantCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    name: str = Field(min_length=2, max_length=200)
+    deployment_model: Literal["multi_tenant_saas", "dedicated", "self_hosted", "hybrid"]
+    country_code: str = Field(min_length=2, max_length=2, pattern=r"^[A-Z]{2}$")
