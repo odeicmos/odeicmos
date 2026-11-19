@@ -81,3 +81,12 @@ Each registry insert and its audit event are written in one MongoDB transaction.
 - No production identity provider has been connected or tested.
 - No MongoDB instance has been connected or tested by this repository change.
 - No endpoint exposes patient records or clinical actions in this increment.
+
+
+## Identity and facility authorization hardening
+
+Role assignments identify a user by the pair `user_issuer` and `user_id` (OIDC issuer plus subject); the subject alone is not globally unique. The unique assignment index includes tenant, issuer, subject, facility, and role. The API security module now exposes `authorize_facility_access`, which fails closed unless an active assignment matches the authenticated issuer, subject, tenant, facility, and one of the caller's allowed roles. Clinical and operational route handlers must call this policy before accessing facility-scoped data; the existence of a role assignment does not itself grant access to every API.
+
+The verifier rejects non-RS256 algorithms, requires standard identity claims, refreshes JWKS once when a key identifier is not found, and distinguishes identity-provider/JWKS unavailability (503) from invalid credentials (401). JWKS is still cached only in process memory without a bounded TTL; production deployment must add a bounded cache and operational key-rotation monitoring.
+
+**Migration note:** existing role-assignment records must be backfilled with the correct trusted OIDC issuer before enabling issuer-scoped authorization. Do not infer an issuer from a user-supplied value. Apply the revised index through a controlled migration after reviewing existing index definitions and duplicate records.
