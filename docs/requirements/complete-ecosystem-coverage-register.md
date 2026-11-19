@@ -98,7 +98,7 @@ This is a conservative status snapshot of committed code, not a production-readi
 |---|---|---|
 | Reception and queue | Partial | Facility-scoped appointment booking, check-in, queue transitions and transactional audit; live queue dashboard, walk-ins, triage priority and wait-time management |
 | Patient registration | Partial | MPI matching/merge, consent, identity verification, guardianship, duplicate review, offline |
-| OPD | Partial | Triage/observations/diagnoses/notes/care-plan foundation; full order, referral, follow-up and clinical decision support |
+| OPD | Partial | Encounter, triage capture with human review/disposition, observations, diagnoses, notes and care-plan foundation; validated clinical pathways, orders, referrals, follow-up and decision support |
 | IPD / ADT | Partial | Beds, admissions, transfers, discharge; nursing charts, rounds, escalation and reconciliation |
 | Pharmacy | Partial | Medication orders, FEFO dispensing, stock movements and MAR capture for administered/withheld/refused doses; allergies, interactions, formulary, dose scheduling/safety, partial supply, controlled drugs, returns/recalls |
 | Procurement / inventory | Partial | Supplier register, draft/submit/segregated purchase-order approval, goods receipts, lots and stock movement events; due diligence, quotations, stock counts, adjustments, valuation, returns and recalls |
@@ -136,3 +136,7 @@ No capability marked partial is approved for live patient care, medication use, 
 - Clinical documentation now supports append-only, separately signed amendments to signed notes, with reason, version counter, transactional audit event and unique amendment-version index. Legal retention, co-signature and late-entry policy remains to be approved.
 - Procurement now has a supplier register and segregated purchase-order lifecycle: draft, submit, independent approval and goods receipt only after approval. Competitive procurement, supplier due diligence and spend-limit controls remain outstanding.
 - Reception appointment creation now uses the shared appointment document fields and lifecycle, and the cash-session payment flow now serializes payment writes against session closure. These are code-level safeguards; concurrency integration tests and successful CI verification are still pending.
+
+
+- Triage assessments now enter an awaiting-review state and require an authorized nurse/clinician/facility administrator to record disposition and rationale. Acuity overrides require a reason; encounter priority is updated transactionally only while the encounter remains open. No universal acuity scale or automatic triage score is assumed.
+- Observation capture now rejects naive/future effective timestamps. Clinical reference ranges, validated early-warning scores and age-/context-specific escalation remain unimplemented pending approved protocols.
