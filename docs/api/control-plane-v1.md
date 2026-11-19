@@ -334,3 +334,11 @@ Requires facility_admin or clinical_governance_officer. A different user from th
 Requires facility_admin or hr_manager. Deactivates a staff record with a reason and audit event. This does not erase historical clinical authorship or audit records.
 
 This is workforce governance foundation only. Rostering, attendance, leave, payroll, benefits, training, occupational health, performance and jurisdiction-specific employment controls remain outstanding. Role assignment and facility clinical privileges must still be managed separately from the HR staff record.
+
+### `POST /api/v1/workforce/shifts`
+
+Requires facility_admin or hr_manager. Schedules a future, timezone-aware shift for an active staff member. The API rejects overlapping scheduled shifts for the same person and uses a transactional staff-row write to serialize concurrent roster changes.
+
+### `POST /api/v1/workforce/shifts/{shift_id}/cancel`
+
+Requires facility_admin or hr_manager. Cancels a scheduled shift with a reason and audit event. This is a roster foundation; published roster acknowledgement, swaps, leave integration, attendance, overtime, payroll export and staffing-ratio validation are not yet implemented.
