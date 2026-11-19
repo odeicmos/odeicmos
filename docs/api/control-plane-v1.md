@@ -306,3 +306,11 @@ This is a first correction-history control. It does not replace a full legally r
 ### Cash-session concurrency safeguard
 
 Cash payments require an open cash session owned by the authenticated operator and matching invoice currency. Recording a cash payment updates the cash-session document in the same transaction, serializing it against session closure. Session close totals only payments explicitly linked to that session and received before the close timestamp. A partial unique index enforces one open session per operator and facility. This still requires concurrent integration tests and formal cash reconciliation controls.
+
+## Human-reviewed triage disposition
+
+### `POST /api/v1/clinical/triage/{triage_id}/review`
+
+Requires facility_admin, nurse or clinician. A qualified staff member records reviewed acuity, a disposition (routine queue, urgent review, emergency response or referral), and clinical rationale. Changing the recorded acuity requires an override reason. The review updates the open encounter's operational priority in the same transaction and creates an audit event. The route intentionally does not infer acuity from vital signs or assume a universal 1–5 acuity direction; interpretation must follow the approved facility and country protocol. If the encounter is no longer open, the review is rejected.
+
+Clinical observations accept timezone-aware effective timestamps and reject future-dated measurements. This is data-integrity validation only; validated reference ranges, age/pregnancy-specific interpretation, early-warning scores and escalation pathways still require approved clinical governance.
