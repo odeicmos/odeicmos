@@ -152,8 +152,10 @@ async def transfer_patient(admission_id: str, payload: BedTransfer, request: Req
                           "updated_at": now}}, session=session)
             if allocated.modified_count != 1 or released.modified_count != 1:
                 raise HTTPException(status_code=409, detail="Bed transfer conflict; transaction rolled back")
-            await db.admissions.update_one({"_id": admission["_id"], "status": "admitted"},
+            moved = await db.admissions.update_one({"_id": admission["_id"], "status": "admitted"},
                 {"$set": {"bed_code": payload.destination_bed_code, "updated_at": now}}, session=session)
+            if moved.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Admission state changed; transfer rolled back")
             await db.admission_transfers.insert_one({"transfer_id": str(uuid4()),
                 "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                 "admission_id": admission_id, "from_bed_code": admission["bed_code"],
@@ -196,10 +198,12 @@ async def discharge_patient(admission_id: str, payload: DischargeCreate, request
                           "discharge_summary": payload.summary}}, session=session)
             if released.modified_count != 1 or discharged.modified_count != 1:
                 raise HTTPException(status_code=409, detail="Discharge state changed; transaction rolled back")
-            await db.encounters.update_one({"tenant_id": payload.tenant_id,
+            closed_encounter = await db.encounters.update_one({"tenant_id": payload.tenant_id,
                 "facility_id": payload.facility_id, "encounter_id": admission["encounter_id"],
                 "status": "open"}, {"$set": {"status": "closed", "ended_at": now,
                 "discharge_disposition": payload.discharge_disposition}}, session=session)
+            if closed_encounter.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Inpatient encounter state changed; discharge rolled back")
             await _audit(db, session, principal, "inpatient.discharge", "admission", admission_id,
                          payload.tenant_id, payload.facility_id)
     return {"admission_id": admission_id, "status": "discharged", "discharged_at": now}
