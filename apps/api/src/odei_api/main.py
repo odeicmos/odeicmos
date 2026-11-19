@@ -48,10 +48,11 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready", tags=["health"])
     async def readiness(request: Request) -> dict[str, str]:
-        if not request.app.state.mongo_ready:
+        identity_configured = all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url))
+        if not request.app.state.mongo_ready or not identity_configured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={"status": "not_ready", "reason": "mongodb_unavailable_or_unconfigured"},
+                detail={"status": "not_ready", "reason": "mongodb_or_identity_provider_unavailable_or_unconfigured"},
             )
         return {"status": "ready", "dependencies": "mongodb"}
 
