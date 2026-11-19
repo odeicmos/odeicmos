@@ -36,6 +36,30 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("created_at", DESCENDING)],
         name="ix_patient_facility_created",
     )
+    await db.encounters.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("encounter_id", ASCENDING)],
+        unique=True, name="uq_encounter_scope_id",
+    )
+    await db.encounters.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING), ("started_at", DESCENDING)],
+        name="ix_encounter_patient_timeline",
+    )
+    await db.clinical_notes.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("note_id", ASCENDING)],
+        unique=True, name="uq_clinical_note_scope_id",
+    )
+    await db.clinical_notes.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("encounter_id", ASCENDING), ("created_at", DESCENDING)],
+        name="ix_clinical_note_encounter_time",
+    )
+    await db.care_plans.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("care_plan_id", ASCENDING)],
+        unique=True, name="uq_care_plan_scope_id",
+    )
+    await db.care_plans.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING), ("status", ASCENDING)],
+        name="ix_care_plan_patient_status",
+    )
     await db.audit_events.create_index(
         [("tenant_id", ASCENDING), ("occurred_at", DESCENDING)], name="ix_audit_tenant_time"
     )
