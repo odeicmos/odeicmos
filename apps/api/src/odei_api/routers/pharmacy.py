@@ -118,7 +118,7 @@ async def dispense_medication_order(
                         "facility_id": payload.facility_id,
                         "medication_code": line["medication_code"],
                         "status": "active", "quantity_on_hand": {"$gt": 0},
-                        "$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": {"$exists": False}}],
+                        "$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": None}],
                     }, session=session).sort([("expiry_at", ASCENDING), ("received_at", ASCENDING)])
                     async for lot in lots:
                         take = min(remaining, int(lot["quantity_on_hand"]))
