@@ -189,7 +189,7 @@ Open and close an operator cash session with an opening float and counted closin
 
 ## Procurement foundation
 
-- `POST /api/v1/procurement/purchase-orders` creates a facility-scoped purchase order using integer minor-unit costs.
+- `POST /api/v1/procurement/purchase-orders` creates a facility-scoped draft purchase order using integer minor-unit costs; submission and independent approval are required before receipt.
 - `POST /api/v1/procurement/goods-receipts` records a receipt against an approved-for-receipt purchase order, prevents cumulative received quantities from exceeding the ordered line, and creates a traceable inventory lot.
 - Buyer and receiver role checks are separate. Goods receipt and lot creation share a MongoDB transaction and audit event.
 - This is not yet a full procurement ledger: supplier master-data verification, multi-level approvals, partial-order lifecycle closure, invoice matching, returns, recalls, stock valuation and independent stock movement ledger remain required. Do not use this slice as sole control for regulated medicines or live financial close.
@@ -301,3 +301,8 @@ The procurement workflow is still partial: competitive quotations, tender evalua
 Requires facility_admin or clinician. Adds a separately signed, append-only amendment to an already signed clinical note. The amendment requires a reason and body, receives a monotonically increasing version, preserves the original note content, and is audited in the same transaction. Concurrent amendments use a guarded counter update and a unique note/version index.
 
 This is a first correction-history control. It does not replace a full legally reviewed signature, co-signature, late-entry, correction, addendum, disclosure and retention policy. Production deployment must configure database permissions to prevent mutation/deletion of signed notes and amendment records.
+
+
+### Cash-session concurrency safeguard
+
+Cash payments require an open cash session owned by the authenticated operator and matching invoice currency. Recording a cash payment updates the cash-session document in the same transaction, serializing it against session closure. Session close totals only payments explicitly linked to that session and received before the close timestamp. A partial unique index enforces one open session per operator and facility. This still requires concurrent integration tests and formal cash reconciliation controls.
