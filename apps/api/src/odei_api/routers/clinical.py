@@ -306,3 +306,45 @@ async def create_diagnosis(payload: DiagnosisCreate, request: Request,
                           "code": payload.code}, session=session)
     return {"diagnosis_id": diagnosis_id, "encounter_id": payload.encounter_id,
             "clinical_status": payload.clinical_status, "recorded_at": now}
+
+
+@router.post("/notes/{note_id}/sign")
+async def sign_clinical_note(note_id: str, payload: dict, request: Request,
+                             principal: Principal = Depends(require_principal)):
+    if set(payload) != {"tenant_id", "facility_id"}:
+        raise HTTPException(status_code=422, detail="Only tenant_id and facility_id are accepted")
+    tenant_id, facility_id = payload["tenant_id"], payload["facility_id"]
+    db = _db(request)
+    role = await authorize_facility_access(
+        request, principal, tenant_id, facility_id,
+        ["facility_admin", "clinician", "nurse"],
+    )
+    note = await db.clinical_notes.find_one({
+        "tenant_id": tenant_id, "facility_id": facility_id, "note_id": note_id,
+        "status": "draft",
+    })
+    if note is None:
+        raise HTTPException(status_code=404, detail="Draft clinical note not found")
+    is_author = note["author_issuer"] == principal.issuer and note["author_subject"] == principal.subject
+    if not is_author and role not in ["facility_admin", "clinician"]:
+        raise HTTPException(status_code=403, detail="Only the author or an authorized clinician may sign")
+    now = datetime.now(timezone.utc)
+    client = request.app.state.mongo_client
+    async with await client.start_session() as session:
+        async with session.start_transaction():
+            changed = await db.clinical_notes.update_one(
+                {"_id": note["_id"], "status": "draft"},
+                {"$set": {"status": "signed", "signed_at": now,
+                          "signer_issuer": principal.issuer, "signer_subject": principal.subject}},
+                session=session,
+            )
+            if changed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Note state changed; reload before signing")
+            await append_audit_event(
+                db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="clinical_note.sign", resource_type="clinical_note",
+                resource_id=note_id, tenant_id=tenant_id, outcome="success",
+                metadata={"facility_id": facility_id, "encounter_id": note["encounter_id"]},
+                session=session,
+            )
+    return {"note_id": note_id, "status": "signed", "signed_at": now}
