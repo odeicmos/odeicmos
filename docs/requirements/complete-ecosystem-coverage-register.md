@@ -88,3 +88,36 @@ All ten first-release modules must pass acceptance tests; clinical users validat
 ## Coverage status
 
 The repository currently contains an architecture baseline, MAC/MAD specification/prototype, an API scaffold and health checks. The full ecosystem described above is the target scope. Modules not yet backed by persistent, authorized, tested workflows remain **planned / not implemented**.
+
+
+## Repository implementation status — 2026-11-19
+
+This is a conservative status snapshot of committed code, not a production-readiness assertion.
+
+| Capability | Current code status | Important remaining work |
+|---|---|---|
+| Reception and queue | Not implemented | Arrival/check-in, queue, routing, appointment desk |
+| Patient registration | Partial | MPI matching/merge, consent, identity verification, guardianship, duplicate review, offline |
+| OPD | Partial | Triage/observations/diagnoses/notes/care-plan foundation; full order, referral, follow-up and clinical decision support |
+| IPD / ADT | Partial | Beds, admissions, transfers, discharge; nursing charts, rounds, medication administration, escalation and reconciliation |
+| Pharmacy | Partial | Medication orders, FEFO dispensing and stock movements; allergies, interactions, formulary, partial supply, controlled drugs, returns/recalls |
+| Procurement / inventory | Partial | Purchase orders, goods receipts, lots and stock movement events; supplier governance, approvals, stock counts, adjustments, valuation, returns and recalls |
+| Immunization | Partial | Administration and adverse-event report; schedule, eligibility, consent, cold-chain, follow-up, causality and national reporting |
+| Billing / cash | Partial | Invoices, payments and cash sessions; double-entry ledger, refunds, credit notes, tariffs, tax, reconciliation and close |
+| Laboratory | Partial | Orders, specimen collection and preliminary results; accession, multiple containers, QC, verified release, critical-result escalation and LIS |
+| Insurance | Partial | Payers, recorded eligibility, claim submission and manual decision; preauthorization, payer integration, remittance, denial/resubmission and settlement |
+| Emergency | Partial | Encounter type and triage primitives only; emergency protocols, resuscitation, observation/escalation and transfer |
+| Nursing / procedures | Partial | Nursing note and inpatient transfer primitives; task lists, MAR, procedures, checklists and clinical observation escalation |
+| Appointments / referrals | Not implemented | Scheduling, capacity, waitlists, referral lifecycle and external referral exchange |
+| HR / payroll | Not implemented | Staff registry, credentials, rota, attendance, payroll and approvals |
+| Facility / equipment | Not implemented | Departments, assets, maintenance, calibration, downtime and serviceability |
+| QA / safety | Not implemented | Incidents, complaints, audit programs, corrective actions and clinical governance |
+| Public health / HMIS | Not implemented | Aggregations, validated reporting, DHIS2/national adapters and submission reconciliation |
+| Patient portal / telehealth | Not implemented | Identity proofing, proxy access, messaging, remote visits and patient-facing records |
+| FHIR / interoperability | Not implemented | Version-pinned FHIR resources, profiles, terminology, conformance and partner testing |
+| Offline operation | Not implemented | Durable local store, encryption, signed sync, idempotency, conflict review and downtime protocol |
+| MAC / MAD | Partial | Prototype/specification and control-plane APIs; production operations, approvals, observability and safe provider adapters |
+| Security / privacy | Partial | OIDC, scoped roles and audit events; ABAC/purpose controls, consent, retention, key lifecycle, immutable audit enforcement, penetration testing |
+| AI governance | Not implemented | No autonomous clinical decisions; governance, evaluation, provenance, human review and audit controls required |
+
+No capability marked partial is approved for live patient care, medication use, financial close or regulatory reporting solely because an endpoint exists. Every production deployment still requires end-to-end workflow tests, facility validation, security review, clinical sign-off, data migration/restore drills, operational training and country-specific approval.
