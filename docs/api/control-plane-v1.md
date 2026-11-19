@@ -238,3 +238,10 @@ Requires facility_admin. Creates a facility-scoped chart-of-accounts entry with 
 Requires facility_admin or finance_officer. Posts an immutable journal entry with a timezone-aware journal date, currency, source reference, idempotency key and at least two lines. Every line must be either a positive debit or a positive credit; total debits must equal total credits and all account codes must be active in the same tenant/facility. The journal and audit event are committed in one MongoDB transaction. A unique tenant/facility/idempotency-key index prevents duplicate posting.
 
 This is a controlled posting foundation, not a complete general ledger. It does not yet implement period locks, account balance snapshots, trial balance, subledger automation, invoice/payment-to-journal posting, tax rules, FX revaluation, reversals/corrections, approval workflows, bank/mobile-money reconciliation, or statutory financial statements. Do not treat it as a complete or independently audited accounting system. Database permissions and operational controls must prevent update/delete of posted journals; corrections should be implemented as separately authorized reversing entries.
+
+
+### `POST /api/v1/pharmacy/administrations`
+
+Requires facility_admin, nurse or clinician. Records an administered, withheld or refused dose against a dispensed medication order. Administered records require a dose, route and positive quantity; withheld/refused records require a reason and zero administered quantity. The order must contain exactly one matching medication line. Cumulative recorded administration quantity cannot exceed the quantity dispensed for that medication code. Each record has an idempotency key and an audit event.
+
+This is a medication administration record (MAR) capture foundation, not a medication safety engine. It does not validate the clinical appropriateness or timing of the dose, patient identity at bedside, allergy/interaction risks, weight/renal/hepatic dosing, infusion rate, barcode scanning, witness requirements, controlled-drug rules or local nursing policy. Those controls and end-to-end clinical validation are mandatory before live use.
