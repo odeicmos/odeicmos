@@ -37,6 +37,7 @@ class PaymentCreate(BaseModel):
     amount_minor: int = Field(gt=0, le=10**12)
     method: Literal["cash", "mobile_money", "card", "bank_transfer", "insurance", "other"]
     external_reference: str | None = Field(default=None, max_length=160)
+    cash_session_id: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class CashSessionOpen(BaseModel):
@@ -107,6 +108,10 @@ async def receive_payment(invoice_id: str, payload: PaymentCreate, request: Requ
     db = _db(request)
     await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, FINANCE_ROLES)
     now, payment_id = datetime.now(timezone.utc), str(uuid4())
+    if payload.method == "cash" and not payload.cash_session_id:
+        raise HTTPException(status_code=422, detail="cash_session_id is required for cash payments")
+    if payload.method != "cash" and payload.cash_session_id is not None:
+        raise HTTPException(status_code=422, detail="cash_session_id is only valid for cash payments")
     client = request.app.state.mongo_client
     async with await client.start_session() as session:
         async with session.start_transaction():
@@ -118,6 +123,15 @@ async def receive_payment(invoice_id: str, payload: PaymentCreate, request: Requ
                 raise HTTPException(status_code=404, detail="Open invoice not found")
             if payload.amount_minor > invoice["balance_minor"]:
                 raise HTTPException(status_code=409, detail="Payment exceeds invoice balance")
+            if payload.method == "cash":
+                cash_session = await db.cash_sessions.find_one({
+                    "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                    "cash_session_id": payload.cash_session_id, "status": "open",
+                    "opened_by_issuer": principal.issuer, "opened_by_subject": principal.subject,
+                    "currency": invoice["currency"],
+                }, session=session)
+                if cash_session is None:
+                    raise HTTPException(status_code=409, detail="An open matching cash session is required")
             balance = invoice["balance_minor"] - payload.amount_minor
             paid = invoice["paid_minor"] + payload.amount_minor
             result = await db.invoices.update_one({
@@ -136,6 +150,7 @@ async def receive_payment(invoice_id: str, payload: PaymentCreate, request: Requ
                 "patient_id": invoice["patient_id"], "amount_minor": payload.amount_minor,
                 "currency": invoice["currency"], "method": payload.method,
                 "external_reference": payload.external_reference, "received_at": now,
+                "cash_session_id": payload.cash_session_id,
                 "received_by_issuer": principal.issuer, "received_by_subject": principal.subject,
             }, session=session)
             await append_audit_event(
@@ -197,21 +212,23 @@ async def close_cash_session(cash_session_id: str, payload: CashSessionClose, re
             }, session=session)
             if cash is None:
                 raise HTTPException(status_code=404, detail="Open cash session not found for operator")
-            expected = cash["opening_float_minor"] + await db.payments.aggregate([
+            totals = await db.payments.aggregate([
                 {"$match": {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-                            "received_by_subject": principal.subject, "method": "cash",
-                            "received_at": {"$gte": cash["opened_at"]}}},
+                            "cash_session_id": cash_session_id, "method": "cash",
+                            "received_at": {"$gte": cash["opened_at"], "$lte": now}}},
                 {"$group": {"_id": None, "total": {"$sum": "$amount_minor"}}},
             ], session=session).to_list(length=1)
-            expected_cash = expected[0]["total"] + cash["opening_float_minor"] if expected else cash["opening_float_minor"]
+            expected_cash = cash["opening_float_minor"] + (totals[0]["total"] if totals else 0)
             variance = payload.counted_cash_minor - expected_cash
-            await db.cash_sessions.update_one(
+            closed = await db.cash_sessions.update_one(
                 {"_id": cash["_id"], "status": "open"},
                 {"$set": {"status": "closed", "closed_at": now,
                           "counted_cash_minor": payload.counted_cash_minor,
                           "expected_cash_minor": expected_cash, "variance_minor": variance}},
                 session=session,
             )
+            if closed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Cash session changed; retry close")
             await append_audit_event(
                 db, actor_id=f"{principal.issuer}|{principal.subject}",
                 action="cash_session.close", resource_type="cash_session",
