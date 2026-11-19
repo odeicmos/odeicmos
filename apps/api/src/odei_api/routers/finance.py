@@ -132,6 +132,13 @@ async def receive_payment(invoice_id: str, payload: PaymentCreate, request: Requ
                 }, session=session)
                 if cash_session is None:
                     raise HTTPException(status_code=409, detail="An open matching cash session is required")
+                touched = await db.cash_sessions.update_one(
+                    {"_id": cash_session["_id"], "status": "open"},
+                    {"$set": {"last_payment_at": now}, "$inc": {"payment_count": 1}},
+                    session=session,
+                )
+                if touched.modified_count != 1:
+                    raise HTTPException(status_code=409, detail="Cash session is closing or closed")
             balance = invoice["balance_minor"] - payload.amount_minor
             paid = invoice["paid_minor"] + payload.amount_minor
             result = await db.invoices.update_one({
