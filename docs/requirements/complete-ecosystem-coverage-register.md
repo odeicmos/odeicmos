@@ -96,7 +96,7 @@ This is a conservative status snapshot of committed code, not a production-readi
 
 | Capability | Current code status | Important remaining work |
 |---|---|---|
-| Reception and queue | Not implemented | Arrival/check-in, queue, routing, appointment desk |
+| Reception and queue | Partial | Appointment booking/check-in/cancellation; live arrival queue, routing and wait-time management |
 | Patient registration | Partial | MPI matching/merge, consent, identity verification, guardianship, duplicate review, offline |
 | OPD | Partial | Triage/observations/diagnoses/notes/care-plan foundation; full order, referral, follow-up and clinical decision support |
 | IPD / ADT | Partial | Beds, admissions, transfers, discharge; nursing charts, rounds, escalation and reconciliation |
@@ -108,7 +108,7 @@ This is a conservative status snapshot of committed code, not a production-readi
 | Insurance | Partial | Payers, recorded eligibility, claim submission and manual decision; preauthorization, payer integration, remittance, denial/resubmission and settlement |
 | Emergency | Partial | Encounter type and triage primitives only; emergency protocols, resuscitation, observation/escalation and transfer |
 | Nursing / procedures | Partial | Nursing note and inpatient transfer primitives; task lists, MAR, procedures, checklists and clinical observation escalation |
-| Appointments / referrals | Not implemented | Scheduling, capacity, waitlists, referral lifecycle and external referral exchange |
+| Appointments / referrals | Partial | Booking, check-in and cancellation; room/resource capacity, waitlists, referrals and reminders |
 | HR / payroll | Not implemented | Staff registry, credentials, rota, attendance, payroll and approvals |
 | Facility / equipment | Not implemented | Departments, assets, maintenance, calibration, downtime and serviceability |
 | QA / safety | Not implemented | Incidents, complaints, audit programs, corrective actions and clinical governance |
