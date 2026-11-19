@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     environment: str = Field(default="development", pattern="^(development|test|staging|production)$")
     api_prefix: str = "/api/v1"
     log_level: str = "INFO"
+    mongodb_uri: SecretStr | None = None
+    mongodb_database: str = "odei_clinic"
 
 
 @lru_cache
