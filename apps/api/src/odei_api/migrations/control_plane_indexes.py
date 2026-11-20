@@ -566,3 +566,27 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
          ("created_at", DESCENDING)],
         name="ix_referral_patient_history",
     )
+
+
+    await db.procedures.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("procedure_id", ASCENDING)],
+        unique=True, name="uq_procedure_scope_id",
+    )
+    await db.procedures.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING),
+         ("planned_at", ASCENDING)],
+        name="ix_procedure_schedule_status",
+    )
+    await db.procedures.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING),
+         ("created_at", DESCENDING)],
+        name="ix_procedure_patient_history",
+    )
+    await db.procedure_safety_checks.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("checklist_id", ASCENDING)],
+        unique=True, name="uq_procedure_checklist_scope_id",
+    )
+    await db.procedure_safety_checks.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("procedure_id", ASCENDING)],
+        unique=True, name="uq_procedure_checklist_per_procedure",
+    )
