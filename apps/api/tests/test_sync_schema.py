@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from pydantic import ValidationError
 
 from odei_api.routers.sync import (
-    DeviceEnrollmentCreate, OfflineChange, SyncBatchCreate, _signed_bytes,
+    DeviceEnrollmentCreate, DeviceRevocationCreate, OfflineChange, SyncBatchCreate, _signed_bytes,
 )
 
 
@@ -69,3 +69,15 @@ def test_batch_signature_covers_scope_ids_and_full_change_payload():
     changed = batch.model_copy(update={"facility_id": "facility-b"})
     with pytest.raises(Exception):
         key.public_key().verify(base64.b64decode(changed.signature), _signed_bytes(changed))
+
+
+def test_device_revocation_requires_a_reason():
+    payload = DeviceRevocationCreate(
+        tenant_id="tenant-a", facility_id="facility-a",
+        reason="Device reported lost; revoke its signing key immediately.",
+    )
+    assert "lost" in payload.reason
+    with pytest.raises(ValidationError):
+        DeviceRevocationCreate(
+            tenant_id="tenant-a", facility_id="facility-a", reason="lost",
+        )
