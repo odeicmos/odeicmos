@@ -342,3 +342,9 @@ Requires facility_admin or hr_manager. Schedules a future, timezone-aware shift 
 ### `POST /api/v1/workforce/shifts/{shift_id}/cancel`
 
 Requires facility_admin or hr_manager. Cancels a scheduled shift with a reason and audit event. This is a roster foundation; published roster acknowledgement, swaps, leave integration, attendance, overtime, payroll export and staffing-ratio validation are not yet implemented.
+
+### `POST /api/v1/insurance/claims/{claim_id}/appeals`
+
+Requires facility_admin or claims_officer. Appeals a rejected or partially accepted claim with a reason and optional evidence-object reference. A claim cannot have more than one pending appeal at a time. Appeal submission is audited and retained separately from the original payer decision. The eligibility check endpoint rejects future-dated checks; claim submission rechecks payer activity, invoice status, patient match, currency and eligibility validity.
+
+This does not connect to an insurer or transmit claims externally. Payer-specific formats, preauthorization, electronic submission, remittance advice, settlement and insurer-side adjudication integrations remain unimplemented.
