@@ -110,7 +110,7 @@ This is a conservative status snapshot of committed code, not a production-readi
 | Nursing / procedures | Partial | Nursing note and inpatient transfer primitives; task lists, MAR, procedures, checklists and clinical observation escalation |
 | Appointments / referrals | Partial | Booking, check-in and cancellation across appointment/reception APIs; room/resource capacity, waitlists, referrals and reminders |
 | HR / payroll | Partial | Facility staff registry, professional credential submission and independent verification, staff deactivation, future shift scheduling/cancellation; attendance, leave, payroll and approvals |
-| Facility / equipment | Not implemented | Departments, assets, maintenance, calibration, downtime and serviceability |
+| Facility / equipment | Partial | Facility asset register, risk classification, maintenance work orders, technician assignment, documented completion and independent release; preventive schedules, calibration due-date enforcement, downtime and serviceability dashboards |
 | QA / safety | Not implemented | Incidents, complaints, audit programs, corrective actions and clinical governance |
 | Public health / HMIS | Not implemented | Aggregations, validated reporting, DHIS2/national adapters and submission reconciliation |
 | Patient portal / telehealth | Not implemented | Identity proofing, proxy access, messaging, remote visits and patient-facing records |
@@ -146,3 +146,5 @@ No capability marked partial is approved for live patient care, medication use, 
 - Workforce now includes a first roster workflow: future timezone-aware shifts, overlap checks, serialized per-staff roster writes, cancellation with reason and audit. It does not yet implement leave, swaps, attendance, staffing ratios or payroll.
 
 - Insurance now supports appeal submission for rejected/partially accepted claims, prevents simultaneous pending appeals per claim, rechecks payer activity at submission and rejects future-dated eligibility checks. External insurer transmission and remittance remain outstanding.
+
+- Facility operations now includes a scoped asset register and segregated maintenance workflow. Equipment with a recorded service impact remains out of service until a different authorized reviewer releases it with checklist evidence. Preventive maintenance, calibration schedules and facilities inspections remain outstanding.
