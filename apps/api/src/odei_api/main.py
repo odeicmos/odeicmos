@@ -22,6 +22,7 @@ from odei_api.routers.safety import router as safety_router
 from odei_api.routers.privacy import router as privacy_router
 from odei_api.routers.sync import router as sync_router
 from odei_api.routers.nursing import router as nursing_router
+from odei_api.routers.emergency import router as emergency_router
 
 
 @asynccontextmanager
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(privacy_router, prefix=settings.api_prefix)
     app.include_router(sync_router, prefix=settings.api_prefix)
     app.include_router(nursing_router, prefix=settings.api_prefix)
+    app.include_router(emergency_router, prefix=settings.api_prefix)
     return app
 
 
