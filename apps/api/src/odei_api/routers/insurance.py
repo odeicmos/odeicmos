@@ -109,6 +109,8 @@ async def record_eligibility(payload: EligibilityRecord, request: Request,
         raise HTTPException(status_code=404, detail="Active payer and patient are required")
     if payload.checked_at.tzinfo is None or payload.checked_at.utcoffset() is None:
         raise HTTPException(status_code=422, detail="checked_at must include timezone")
+    if payload.checked_at > datetime.now(timezone.utc):
+        raise HTTPException(status_code=422, detail="checked_at cannot be in the future")
     if payload.valid_until and (payload.valid_until.tzinfo is None or payload.valid_until.utcoffset() is None):
         raise HTTPException(status_code=422, detail="valid_until must include timezone")
     eligibility_id, now = str(uuid4()), datetime.now(timezone.utc)
