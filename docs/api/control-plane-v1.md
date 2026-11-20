@@ -477,3 +477,13 @@ This is a documented episode and decision workflow, not an automated emergency c
 - Referral state transitions are guarded and audited; duplicate terminal transitions are rejected.
 
 This is an initial referral register and decision workflow. Cross-organization identity federation, external provider acknowledgements, secure referral document exchange, transport coordination, appointment scheduling, referral SLA escalation and national referral-network integration are not implemented. An external destination string is a record of intent, not proof that the external provider received or accepted the referral.
+
+
+## Procedure safety and completion workflow
+
+- `POST /api/v1/procedures`: creates a procedure request linked to an active patient and open encounter.
+- `POST /api/v1/procedures/{procedure_id}/safety-checklist`: records patient identity, procedure/site confirmation, consent status, allergy review, equipment/supplies, infection-prevention readiness and site-marking status. Required safety checks block progression when incomplete.
+- `POST /api/v1/procedures/{procedure_id}/start`: requires a confirmed team time-out and records team members before starting.
+- `POST /api/v1/procedures/{procedure_id}/complete`: records outcome, findings, complications and post-procedure plan.
+
+The checklist is a workflow attestation, not proof that consent is legally valid or that an independent identity check, allergy review, sterilization check or site marking actually occurred. Evidence capture, specialty-specific checklists, sedation/anaesthesia assessment, equipment traceability, recovery observations, pathology linkage, adverse-event management and independent procedural privileges verification remain outstanding. The API must not be used as a substitute for local procedural safety protocols.
