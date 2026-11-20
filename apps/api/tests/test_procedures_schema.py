@@ -29,7 +29,7 @@ def test_procedure_request_requires_aware_schedule_and_bounded_fields():
 def test_procedure_checklist_and_start_require_explicit_safety_fields():
     checklist = ProcedureSafetyChecklist(**scope(
         patient_identity_verified=True, procedure_and_site_confirmed=True,
-        consent_status="obtained", allergies_reviewed=True,
+        consent_status="obtained", consent_evidence_reference="consent-record-123", allergies_reviewed=True,
         equipment_and_supplies_checked=True, infection_prevention_ready=True,
         site_marking_status="completed", checklist_note="All checks complete",
     ))
