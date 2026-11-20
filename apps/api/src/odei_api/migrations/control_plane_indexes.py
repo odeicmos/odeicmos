@@ -385,3 +385,28 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         unique=True, partialFilterExpression={"status": "submitted"},
         name="uq_one_pending_appeal_per_claim",
     )
+
+    await db.facility_assets.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("asset_id", ASCENDING)],
+        unique=True, name="uq_facility_asset_scope_id",
+    )
+    await db.facility_assets.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("asset_code", ASCENDING)],
+        unique=True, name="uq_facility_asset_code",
+    )
+    await db.facility_assets.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING), ("risk_class", ASCENDING)],
+        name="ix_facility_asset_status_risk",
+    )
+    await db.facility_work_orders.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("work_order_id", ASCENDING)],
+        unique=True, name="uq_facility_work_order_scope_id",
+    )
+    await db.facility_work_orders.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING), ("priority", ASCENDING), ("created_at", ASCENDING)],
+        name="ix_facility_work_order_queue",
+    )
+    await db.facility_work_orders.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("asset_id", ASCENDING), ("created_at", DESCENDING)],
+        name="ix_facility_work_order_asset_time",
+    )
