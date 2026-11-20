@@ -456,3 +456,13 @@ Payload inspection: `GET /api/v1/sync/inbox/{change_id}?tenant_id=...&facility_i
 - `POST /api/v1/nursing/handovers/{handover_id}/acknowledge`: a different nurse acknowledges receipt with a note. The author cannot acknowledge their own handover.
 
 This is a nursing workflow foundation, not a complete electronic medication/observation chart or staffing system. It does not yet implement scheduled task escalation, overdue monitoring, bedside barcode workflows, validated nursing assessment scales, wound/pressure-injury scoring, fluid balance, pain scales, nursing care-plan execution, shift rosters, or clinical handover completeness rules. Facility-approved protocols and qualified clinical review remain mandatory.
+
+
+## Emergency department episode workflow
+
+- `POST /api/v1/emergency/episodes`: opens one ED episode against an existing open emergency encounter and records arrival mode, time, complaint and referral context.
+- `POST /api/v1/emergency/episodes/{episode_id}/events`: appends resuscitation, airway, cardiac-arrest, seizure, trauma, hemorrhage, deterioration, procedure, senior-review or other event documentation with actions and response.
+- `POST /api/v1/emergency/episodes/{episode_id}/handovers`: records receiving service, clinical summary, outstanding actions and risk flags.
+- `POST /api/v1/emergency/episodes/{episode_id}/disposition`: an authorized clinician or facility administrator records discharge, admission, transfer, referral, leaving before completion or death. Transfer/referral requires a destination. The workflow refuses disposition while an ED handover remains unacknowledged.
+
+This is a documented episode and decision workflow, not an automated emergency clinical decision-support system. It does not determine acuity, prescribe resuscitation, execute admission or external transfer, confirm transport acceptance, perform death certification, or replace locally approved emergency protocols. Triage remains in the clinical API and must be performed/reviewed by trained staff. Actual disposition execution must use the corresponding inpatient, referral, transport and statutory workflows.
