@@ -1,6 +1,8 @@
 """Patient registration endpoints with facility-scoped access and audited writes."""
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timezone
 from uuid import uuid4
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pymongo.errors import DuplicateKeyError
@@ -12,6 +14,16 @@ from odei_api.security import Principal, authorize_facility_access, require_prin
 router = APIRouter(prefix="/patients", tags=["patient-registration"])
 REGISTRATION_ROLES = ["facility_admin", "clinician", "nurse", "receptionist"]
 
+
+
+class PatientMatchReview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    patient_id: str = Field(min_length=1, max_length=64)
+    candidate_patient_id: str = Field(min_length=1, max_length=64)
+    outcome: Literal["same_person", "different_person", "needs_more_information"]
+    rationale: str = Field(min_length=10, max_length=2000)
 
 def _database(request: Request):
     db = getattr(request.app.state, "mongo_database", None)
@@ -120,3 +132,57 @@ async def get_patient(
         metadata={"facility_id": facility_id},
     )
     return patient
+
+@router.get("/identity-match/candidates")
+async def find_identity_match_candidates(tenant_id: str, facility_id: str, request: Request,
+    medical_record_number: str | None = None, phone_number: str | None = None,
+    date_of_birth: date | None = None, principal: Principal = Depends(require_principal)):
+    db = _database(request)
+    await authorize_facility_access(request, principal, tenant_id, facility_id, REGISTRATION_ROLES)
+    if not medical_record_number and not (phone_number and date_of_birth):
+        raise HTTPException(status_code=422, detail="Provide MRN or both phone number and date of birth")
+    if date_of_birth and date_of_birth > datetime.now(timezone.utc).date():
+        raise HTTPException(status_code=422, detail="Date of birth cannot be in the future")
+    clauses = []
+    if medical_record_number:
+        clauses.append({"medical_record_number": medical_record_number.strip()})
+    if phone_number and date_of_birth:
+        dob = datetime.combine(date_of_birth, time.min, tzinfo=timezone.utc)
+        clauses.append({"phone_number": phone_number.strip(), "date_of_birth": dob})
+    candidates = await db.patients.find({"tenant_id": tenant_id, "facility_id": facility_id,
+        "record_status": "active", "$or": clauses},
+        projection={"_id": 0, "patient_id": 1, "medical_record_number": 1,
+            "legal_name": 1, "preferred_name": 1, "date_of_birth": 1, "phone_number": 1}
+    ).limit(10).to_list(length=10)
+    await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
+        action="patient.identity_match.search", resource_type="patient_identity_match",
+        resource_id="query", tenant_id=tenant_id, outcome="success",
+        metadata={"facility_id": facility_id, "candidate_count": len(candidates)})
+    return {"candidates": candidates, "review_required": bool(candidates),
+        "automatic_merge_performed": False}
+
+@router.post("/identity-match/reviews", status_code=status.HTTP_201_CREATED)
+async def record_identity_match_review(payload: PatientMatchReview, request: Request,
+    principal: Principal = Depends(require_principal)):
+    db = _database(request)
+    await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id,
+        ["facility_admin", "clinician", "nurse", "receptionist", "medical_records_officer"])
+    if payload.patient_id == payload.candidate_patient_id:
+        raise HTTPException(status_code=422, detail="A patient cannot be matched against itself")
+    ids = [payload.patient_id, payload.candidate_patient_id]
+    patients = await db.patients.find({"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+        "patient_id": {"$in": ids}, "record_status": "active"}, projection={"patient_id": 1}).to_list(length=2)
+    if len(patients) != 2:
+        raise HTTPException(status_code=404, detail="Both active patient records must exist in this facility")
+    review_id, now = str(uuid4()), datetime.now(timezone.utc)
+    async with await request.app.state.mongo_client.start_session() as session:
+        async with session.start_transaction():
+            await db.patient_identity_reviews.insert_one(payload.model_dump() | {
+                "review_id": review_id, "reviewed_at": now,
+                "reviewer_issuer": principal.issuer, "reviewer_subject": principal.subject}, session=session)
+            await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="patient.identity_match.review", resource_type="patient_identity_review",
+                resource_id=review_id, tenant_id=payload.tenant_id, outcome="success",
+                metadata={"facility_id": payload.facility_id, "outcome": payload.outcome}, session=session)
+    return {"review_id": review_id, "outcome": payload.outcome, "reviewed_at": now,
+        "records_merged": False}
