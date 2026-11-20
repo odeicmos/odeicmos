@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from odei_api.routers.emergency import (
     EmergencyDispositionCreate, EmergencyEpisodeCreate, EmergencyEventCreate,
-    EmergencyHandoverCreate,
+    EmergencyHandoverCreate, EmergencyHandoverAcknowledge,
 )
 
 
@@ -62,3 +62,10 @@ def test_emergency_handover_is_bounded_and_rejects_extra_fields():
         EmergencyHandoverCreate(**scope(
             receiving_service="Ward", clinical_summary="Summary", unapproved="extra",
         ))
+
+
+def test_emergency_handover_acknowledgement_requires_note():
+    payload = EmergencyHandoverAcknowledge(**scope(acknowledgement_note="Received by ward team"))
+    assert "ward" in payload.acknowledgement_note
+    with pytest.raises(ValidationError):
+        EmergencyHandoverAcknowledge(**scope(acknowledgement_note=""))
