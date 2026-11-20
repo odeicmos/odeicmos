@@ -219,7 +219,7 @@ async def complete_procedure(procedure_id: str, payload: ProcedureCompletion, re
                 raise HTTPException(status_code=404, detail="In-progress procedure not found")
             changed = await db.procedures.update_one(
                 {"_id": procedure["_id"], "status": "in_progress"},
-                {"$set": {"status": "completed", "outcome": payload.outcome,
+                {"$set": {"status": "completed" if payload.outcome == "completed" else "not_completed", "outcome": payload.outcome,
                           "performed_at": payload.performed_at, "findings": payload.findings,
                           "complications": payload.complications, "post_procedure_plan": payload.post_procedure_plan,
                           "completed_at": now, "completed_by_issuer": principal.issuer,
@@ -229,4 +229,4 @@ async def complete_procedure(procedure_id: str, payload: ProcedureCompletion, re
                 raise HTTPException(status_code=409, detail="Procedure state changed; retry after reload")
             await _audit(db, session, principal, "procedure.complete", procedure_id,
                          payload.tenant_id, payload.facility_id, {"outcome": payload.outcome})
-    return {"procedure_id": procedure_id, "status": "completed", "outcome": payload.outcome}
+    return {"procedure_id": procedure_id, "status": "completed" if payload.outcome == "completed" else "not_completed", "outcome": payload.outcome}
