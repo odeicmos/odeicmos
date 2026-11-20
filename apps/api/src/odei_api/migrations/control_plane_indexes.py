@@ -450,3 +450,22 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
          ("purpose_code", ASCENDING), ("recorded_at", DESCENDING)],
         name="ix_patient_consent_patient_purpose_time",
     )
+
+    await db.data_subject_requests.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("request_id", ASCENDING)],
+        unique=True, name="uq_data_subject_request_scope_id",
+    )
+    await db.data_subject_requests.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING),
+         ("status", ASCENDING), ("created_at", DESCENDING)],
+        name="ix_data_subject_request_patient_status",
+    )
+    await db.data_subject_request_events.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("event_id", ASCENDING)],
+        unique=True, name="uq_data_subject_request_event_id",
+    )
+    await db.data_subject_request_events.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("request_id", ASCENDING),
+         ("occurred_at", ASCENDING)],
+        name="ix_data_subject_request_event_timeline",
+    )
