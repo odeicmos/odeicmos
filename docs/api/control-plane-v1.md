@@ -446,3 +446,13 @@ This is case tracking, not automated fulfilment. It does not disclose, alter, ex
 Device revocation: `POST /api/v1/sync/devices/{device_id}/revoke` allows a facility administrator to revoke an active device with a reason. Revoked devices cannot submit additional batches. Key rotation requires revocation and a new controlled enrollment.
 
 Payload inspection: `GET /api/v1/sync/inbox/{change_id}?tenant_id=...&facility_id=...` exposes an individual staged payload only to facility/records/privacy or relevant clinical/finance/procurement roles and audits the read. The list endpoint continues to omit payload bodies.
+
+
+## Nursing task and handover workflows
+
+- `POST /api/v1/nursing/tasks`: creates a patient/encounter-scoped nursing task with category, priority, due time and optional staff-subject assignment. An optional inpatient admission must be active and match the patient and encounter.
+- `POST /api/v1/nursing/tasks/{task_id}/outcome`: an authorized nurse records completed, not-done or cancelled with an outcome note. Assigned tasks cannot be completed by another nurse; a facility administrator can intervene. State changes are guarded and audited.
+- `POST /api/v1/nursing/handovers`: records an SBAR-style patient handover, outstanding actions and structured risk flags.
+- `POST /api/v1/nursing/handovers/{handover_id}/acknowledge`: a different nurse acknowledges receipt with a note. The author cannot acknowledge their own handover.
+
+This is a nursing workflow foundation, not a complete electronic medication/observation chart or staffing system. It does not yet implement scheduled task escalation, overdue monitoring, bedside barcode workflows, validated nursing assessment scales, wound/pressure-injury scoring, fluid balance, pain scales, nursing care-plan execution, shift rosters, or clinical handover completeness rules. Facility-approved protocols and qualified clinical review remain mandatory.
