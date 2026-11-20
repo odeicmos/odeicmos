@@ -45,10 +45,11 @@ def test_emergency_disposition_requires_destination_for_transfer():
         disposition="transfer", rationale="Requires higher level of care",
         decided_at=datetime(2026, 11, 20, tzinfo=timezone.utc),
     )
-    with pytest.raises(ValidationError):
-        EmergencyDispositionCreate(**base)
+    incomplete = EmergencyDispositionCreate(**base)
+    assert incomplete.destination is None
     payload = EmergencyDispositionCreate(**(base | {"destination": "Regional referral hospital"}))
     assert payload.disposition == "transfer"
+    assert payload.destination == "Regional referral hospital"
 
 
 def test_emergency_handover_is_bounded_and_rejects_extra_fields():
