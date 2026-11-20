@@ -372,3 +372,23 @@ Only the assigned technician may record work performed and supporting evidence. 
 Requires facility_admin or clinical_engineer, and the technician who completed the work cannot release it. A checklist evidence reference and rationale are required before the asset returns to service.
 
 This is an asset and maintenance control foundation. Preventive maintenance schedules, calibration due-date enforcement, vendor contracts, spare-parts inventory, equipment telemetry, biomedical engineering certifications and facility inspections remain outstanding.
+
+## Quality and safety incident management
+
+### `POST /api/v1/safety/incidents`
+
+Authorized clinical and facility staff can report clinical safety events, medication events, laboratory events, infection risks, equipment issues, privacy/security events, complaints, near misses and other incidents. Occurrence time must be timezone-aware and cannot be future-dated. Reports are retained as separate incident records, not ordinary clinical notes.
+
+### `POST /api/v1/safety/incidents/{incident_id}/investigate`
+
+Requires facility_admin, quality_officer or clinical_governance_officer. Starts an investigation and appends a typed investigation note. The reporter cannot lead their own investigation.
+
+### `POST /api/v1/safety/incidents/{incident_id}/notes`
+
+Appends findings, interview records, evidence references, risk controls or corrective-action notes to an open investigation. Notes are not edited in place.
+
+### `POST /api/v1/safety/incidents/{incident_id}/close`
+
+Requires an authorized investigation role, a root-cause summary, corrective-action summary, residual-risk classification and evidence reference. The original reporter cannot close their own incident.
+
+The API does not yet implement external statutory reporting, complaint case management, safeguarding, infection-surveillance analytics, risk scoring, CAPA effectiveness reviews or automated regulator notifications. Confidentiality and role-based access must be supplemented by purpose-based access and document-store controls before production.
