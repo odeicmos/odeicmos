@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from odei_api.routers.privacy import ConsentEventCreate
+from odei_api.routers.privacy import (\n    ConsentEventCreate, DataSubjectRequestCreate,\n    IdentityVerificationCreate, DataSubjectRequestTransition,\n)
 
 
 def test_consent_event_requires_timezone_and_explicit_purpose():
@@ -62,4 +62,41 @@ def test_other_lawful_basis_is_recorded_without_claiming_consent():
             purpose_code="care_delivery", data_categories=["clinical"],
             action="granted", lawful_basis="healthcare_delivery", notice_version="v1",
             recorded_at="2026-11-20T10:00:00+03:00",
+        )
+
+
+def test_data_subject_request_requires_timezone_and_scoped_request():
+    request = DataSubjectRequestCreate(
+        tenant_id="tenant-a", facility_id="facility-a", patient_id="patient-a",
+        request_type="access", requester_type="patient", requester_name="Patient One",
+        requested_scope="Copy of the patient's longitudinal record.",
+        received_at="2026-11-20T10:00:00+03:00",
+    )
+    assert request.request_type == "access"
+    with pytest.raises(ValidationError):
+        DataSubjectRequestCreate(
+            tenant_id="tenant-a", facility_id="facility-a", patient_id="patient-a",
+            request_type="access", requester_type="patient", requester_name="Patient One",
+            requested_scope="Copy of the patient's longitudinal record.",
+            received_at="2026-11-20T10:00:00",
+        )
+
+
+def test_identity_verification_and_request_transitions_require_evidence():
+    verified = IdentityVerificationCreate(
+        tenant_id="tenant-a", facility_id="facility-a", outcome="verified",
+        method="in_person_document", evidence_reference="private-object://identity/check-1",
+        rationale="Identity checked against the approved in-person document procedure.",
+    )
+    assert verified.outcome == "verified"
+    transition = DataSubjectRequestTransition(
+        tenant_id="tenant-a", facility_id="facility-a", status="fulfilled",
+        rationale="The approved response package was delivered to the verified requester.",
+        evidence_reference="private-object://dsr/delivery-1",
+    )
+    assert transition.status == "fulfilled"
+    with pytest.raises(ValidationError):
+        DataSubjectRequestTransition(
+            tenant_id="tenant-a", facility_id="facility-a", status="fulfilled",
+            rationale="short",
         )
