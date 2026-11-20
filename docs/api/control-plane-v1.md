@@ -392,3 +392,13 @@ Appends findings, interview records, evidence references, risk controls or corre
 Requires an authorized investigation role, a root-cause summary, corrective-action summary, residual-risk classification and evidence reference. The original reporter cannot close their own incident.
 
 The API does not yet implement external statutory reporting, complaint case management, safeguarding, infection-surveillance analytics, risk scoring, CAPA effectiveness reviews or automated regulator notifications. Confidentiality and role-based access must be supplemented by purpose-based access and document-store controls before production.
+
+## Patient identity matching
+
+### `GET /api/v1/patients/identity-match/candidates`
+
+Requires a facility registration role. Search uses either an exact facility MRN or an exact phone number plus date of birth. It returns at most ten candidate records and records an audit event. The response explicitly indicates that no automatic merge was performed.
+
+### `POST /api/v1/patients/identity-match/reviews`
+
+Requires facility_admin, clinician, nurse, receptionist or medical_records_officer. Records a human review outcome (same person, different person or more information required) with rationale. It does not merge or overwrite patient records. Duplicate resolution, enterprise MPI, cross-facility identity linking, verified identity evidence, guardian/proxy relationships and consent/legal-basis workflows remain outstanding.
