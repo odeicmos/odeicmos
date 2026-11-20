@@ -103,7 +103,7 @@ async def create_work_order(payload: WorkOrderCreate, request: Request, principa
             await db.facility_work_orders.insert_one(payload.model_dump() | {"work_order_id": work_order_id,
                 "asset_code": asset["asset_code"], "status": "open", "created_at": now,
                 "created_by_subject": principal.subject}, session=session)
-            if payload.service_impact == "out_of_service":
+            if payload.service_impact != "none":
                 changed = await db.facility_assets.update_one({"_id": asset["_id"], "status": asset["status"]},
                     {"$set": {"status": "maintenance", "updated_at": now}}, session=session)
                 if changed.modified_count != 1:
