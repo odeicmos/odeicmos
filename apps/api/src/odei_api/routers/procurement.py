@@ -1,6 +1,5 @@
 """Procurement and stock-receipt workflow foundation."""
 from datetime import datetime, timezone
-from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -139,7 +138,7 @@ async def receive_goods(payload: GoodsReceiptCreate, request: Request,
                 "lot_id": lot_id, "tenant_id": payload.tenant_id,
                 "facility_id": payload.facility_id, "item_code": payload.item_code,
                 "lot_number": payload.lot_number, "batch_number": payload.lot_number,
-                "item_code": payload.item_code, "medication_code": payload.item_code,
+                "medication_code": payload.item_code,
                 "quantity_available": payload.quantity_received,
                 "quantity_on_hand": payload.quantity_received,
                 "unit_cost_minor": payload.unit_cost_minor,
