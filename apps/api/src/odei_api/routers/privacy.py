@@ -8,7 +8,7 @@ from uuid import uuid4
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pymongo.errors import DuplicateKeyError
 
 from odei_api.audit import append_audit_event
@@ -57,6 +57,14 @@ class ConsentEventCreate(BaseModel):
         if len(set(normalized)) != len(normalized):
             raise ValueError("data categories must be unique")
         return normalized
+
+    @model_validator(mode="after")
+    def validate_basis_action(self):
+        if self.action in ["granted", "declined", "withdrawn"] and self.lawful_basis != "consent":
+            raise ValueError("consent decisions must use the consent lawful basis")
+        if self.action == "basis_recorded" and self.lawful_basis == "consent":
+            raise ValueError("use a consent decision for the consent lawful basis")
+        return self
 
 
 def _db(request: Request):
