@@ -418,3 +418,12 @@ Returns up to 100 append-only consent events for an active facility role. Reads 
 
 
 Consent-event actions are `granted`, `declined` and `withdrawn` only when the lawful basis is `consent`. A non-consent basis is recorded with `action: basis_recorded`; this avoids falsely representing healthcare delivery or legal obligation as patient consent. Withdrawal requires the latest matching grant to remain unexpired and uses the same purpose and data-category scope.
+
+
+## Patient data-subject request workflow (initial)
+
+- `POST /api/v1/privacy/data-subject-requests`: privacy/medical-records staff register access, correction, portability, restriction, erasure or objection requests. The case begins with identity verification pending.
+- `POST /api/v1/privacy/data-subject-requests/{request_id}/verify-identity`: privacy or data-protection officer records verified/rejected identity, approved method, evidence reference and rationale.
+- `POST /api/v1/privacy/data-subject-requests/{request_id}/transition`: privacy/data-protection officer advances a verified request to review and then to fulfilled, partially fulfilled, declined or withdrawn. Every transition appends an event and audit record; invalid transitions fail closed.
+
+This is case tracking, not automated fulfilment. It does not disclose, alter, export or erase patient data; does not establish a universal statutory deadline; does not decide exemptions; and does not replace identity proofing, legal review, guardian authority checks, secure response delivery or the approved country-specific data-subject-rights procedure. Fulfilment must be performed through separately authorized and evidenced workflows.
