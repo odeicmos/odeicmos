@@ -107,7 +107,7 @@ This is a conservative status snapshot of committed code, not a production-readi
 | Laboratory | Partial | Orders, specimen collection and preliminary results; accession, multiple containers, QC, verified release, critical-result escalation and LIS |
 | Insurance | Partial | Payers, eligibility evidence, claim submission, manual payer decision and appeal submission; preauthorization, payer integration, remittance, denial/resubmission and settlement |
 | Emergency | Partial | Emergency encounter and triage/review foundations; ED episode registration, append-only critical-event/resuscitation documentation, receiving-service handover and clinician disposition decision; actual transfer/admission execution, transport acceptance, protocol support and escalation remain outstanding |
-| Nursing / procedures | Partial | Nursing notes, inpatient transfer, assigned nursing tasks with outcomes, SBAR handover and independent acknowledgement; validated assessment scales, fluid balance, wound care, shift rosters, task escalation, procedure checklists and clinical observation escalation remain outstanding |
+| Nursing / procedures | Partial | Nursing notes, inpatient transfer, assigned nursing tasks/outcomes, SBAR handover, referral lifecycle and procedure request/safety checklist/time-out/completion records; validated assessment scales, fluid balance, wound care, sedation/anaesthesia, recovery observations, specialty checklists and procedure privileges remain outstanding |
 | Appointments / referrals | Partial | Booking, check-in, queue transitions and initial referral creation/acceptance/closure lifecycle; room/resource capacity, cross-organization acknowledgement, waitlists, referral SLAs and reminders remain outstanding |
 | HR / payroll | Partial | Facility staff registry, professional credential submission and independent verification, staff deactivation, future shift scheduling/cancellation; attendance, leave, payroll and approvals |
 | Facility / equipment | Partial | Facility asset register, risk classification, maintenance work orders, technician assignment, documented completion and independent release; preventive schedules, calibration due-date enforcement, downtime and serviceability dashboards |
@@ -169,3 +169,5 @@ No capability marked partial is approved for live patient care, medication use, 
 
 
 - Referral management now includes patient/encounter-linked referral creation, urgency and specialty capture, receiving-side acceptance/decline with independent actor and rationale, and outcome-based closure. External receipt and partner interoperability remain unimplemented.
+
+- Procedures now have patient/encounter-linked requests, documented safety checklist, team time-out gate, procedure start and outcome/findings/complications/post-care recording. This does not validate legal consent, clinician privileges, equipment sterility or specialty-specific safety protocols.
