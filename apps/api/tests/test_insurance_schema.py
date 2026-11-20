@@ -43,3 +43,11 @@ def test_claim_decision_requires_valid_status_and_amount():
     assert decision.decision == "accepted"
     with pytest.raises(ValidationError):
         ClaimDecision(**scope(decision="unknown", approved_amount_minor=0, reason="Rejected"))
+
+
+def test_claim_appeal_requires_reason_and_rejects_unknown_fields():
+    from odei_api.routers.insurance import ClaimAppeal
+    appeal = ClaimAppeal(**scope(reason="Please review the attached adjudication and coding evidence."))
+    assert appeal.reason.startswith("Please")
+    with pytest.raises(ValidationError):
+        ClaimAppeal(**scope(reason="x", unknown_field="not-allowed"))
