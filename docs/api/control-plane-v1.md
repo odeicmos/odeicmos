@@ -482,7 +482,7 @@ This is an initial referral register and decision workflow. Cross-organization i
 ## Procedure safety and completion workflow
 
 - `POST /api/v1/procedures`: creates a procedure request linked to an active patient and open encounter.
-- `POST /api/v1/procedures/{procedure_id}/safety-checklist`: records patient identity, procedure/site confirmation, consent status, allergy review, equipment/supplies, infection-prevention readiness and site-marking status. Required safety checks block progression when incomplete.
+- `POST /api/v1/procedures/{procedure_id}/safety-checklist`: records patient identity, procedure/site confirmation, consent status and evidence reference, allergy review, equipment/supplies, infection-prevention readiness and site-marking status. Required safety checks block progression when incomplete.
 - `POST /api/v1/procedures/{procedure_id}/start`: requires a confirmed team time-out and records team members before starting.
 - `POST /api/v1/procedures/{procedure_id}/complete`: records outcome, findings, complications and post-procedure plan.
 
