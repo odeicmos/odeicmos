@@ -427,3 +427,17 @@ Consent-event actions are `granted`, `declined` and `withdrawn` only when the la
 - `POST /api/v1/privacy/data-subject-requests/{request_id}/transition`: privacy/data-protection officer advances a verified request to review and then to fulfilled, partially fulfilled, declined or withdrawn. Every transition appends an event and audit record; invalid transitions fail closed.
 
 This is case tracking, not automated fulfilment. It does not disclose, alter, export or erase patient data; does not establish a universal statutory deadline; does not decide exemptions; and does not replace identity proofing, legal review, guardian authority checks, secure response delivery or the approved country-specific data-subject-rights procedure. Fulfilment must be performed through separately authorized and evidenced workflows.
+
+
+## Secure offline synchronization intake (initial)
+
+### Device enrollment
+`POST /api/v1/sync/devices` — facility administrator enrolls a device with a unique device identifier and Ed25519 public key in PEM format. The device private key must remain in platform-secure hardware/key storage and must never be uploaded. Device enrollment is bound to the administrator's OIDC issuer/subject and facility.
+
+### Signed batch intake
+`POST /api/v1/sync/batches` — authenticated facility user submits a batch of up to 100 changes. The Ed25519 signature covers canonical UTF-8 JSON containing tenant, facility, device, batch and complete change list. Each change has a globally unique client change ID, aggregate type/ID, base version, timezone-aware client timestamp, change type and bounded payload. Batch and change IDs are unique in persistence; retries must reuse the original batch identifier. The server stages changes only and returns `applied_count: 0`.
+
+### Review
+`GET /api/v1/sync/inbox` — authorized privacy/medical-records/facility roles can inspect pending metadata. Payloads are intentionally omitted from this list response. `POST /api/v1/sync/inbox/{change_id}/review` records accepted-for-manual-reconciliation or rejected with rationale. This decision does not apply the payload.
+
+**Safety boundary:** this is not yet an offline client, encrypted local database, key rotation/revocation console, clock-drift defense, per-change clinical authorization, conflict-resolution engine, or downtime procedure. Payloads remain untrusted and require resource-specific validation and authorized reconciliation before any operational record changes. Deployments must provide TLS, encrypted database/storage backups, device key protection, rate limits and body-size limits. Do not use this intake as a substitute for an approved clinical downtime process.
