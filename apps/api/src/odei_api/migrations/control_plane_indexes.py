@@ -512,3 +512,41 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
          ("created_at", DESCENDING)],
         name="ix_nursing_handover_ack_queue",
     )
+
+
+    await db.emergency_episodes.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("episode_id", ASCENDING)],
+        unique=True, name="uq_emergency_episode_scope_id",
+    )
+    await db.emergency_episodes.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("encounter_id", ASCENDING)],
+        unique=True, name="uq_emergency_episode_encounter",
+    )
+    await db.emergency_episodes.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING), ("arrival_at", ASCENDING)],
+        name="ix_emergency_active_arrivals",
+    )
+    await db.emergency_events.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("event_id", ASCENDING)],
+        unique=True, name="uq_emergency_event_scope_id",
+    )
+    await db.emergency_events.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("episode_id", ASCENDING), ("occurred_at", ASCENDING)],
+        name="ix_emergency_event_timeline",
+    )
+    await db.emergency_handovers.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("handover_id", ASCENDING)],
+        unique=True, name="uq_emergency_handover_scope_id",
+    )
+    await db.emergency_handovers.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("episode_id", ASCENDING), ("status", ASCENDING)],
+        name="ix_emergency_handover_status",
+    )
+    await db.emergency_dispositions.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("disposition_id", ASCENDING)],
+        unique=True, name="uq_emergency_disposition_scope_id",
+    )
+    await db.emergency_dispositions.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("episode_id", ASCENDING)],
+        unique=True, name="uq_emergency_disposition_episode",
+    )
