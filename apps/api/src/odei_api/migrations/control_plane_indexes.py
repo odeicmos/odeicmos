@@ -371,3 +371,17 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("staff_id", ASCENDING), ("status", ASCENDING), ("starts_at", ASCENDING)],
         name="ix_staff_shift_staff_status_start",
     )
+
+    await db.insurance_claim_appeals.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("appeal_id", ASCENDING)],
+        unique=True, name="uq_claim_appeal_scope_id",
+    )
+    await db.insurance_claim_appeals.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("claim_id", ASCENDING), ("status", ASCENDING)],
+        name="ix_claim_appeal_claim_status",
+    )
+    await db.insurance_claim_appeals.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("claim_id", ASCENDING)],
+        unique=True, partialFilterExpression={"status": "submitted"},
+        name="uq_one_pending_appeal_per_claim",
+    )
