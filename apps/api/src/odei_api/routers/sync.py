@@ -7,7 +7,7 @@ client payloads directly to clinical, stock or financial records.
 import base64
 import binascii
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from cryptography.exceptions import InvalidSignature
@@ -101,15 +101,25 @@ def _db(request: Request):
     return db
 
 
+def _canonical_batch(values: dict) -> bytes:
+    signed = dict(values)
+    signed["changes"] = [
+        change.model_dump(mode="json") if isinstance(change, OfflineChange) else change
+        for change in signed["changes"]
+    ]
+    return json.dumps(
+        signed, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+
+
 def _signed_bytes(payload: SyncBatchCreate) -> bytes:
-    signed = {
+    return _canonical_batch({
         "tenant_id": payload.tenant_id,
         "facility_id": payload.facility_id,
         "device_id": payload.device_id,
         "batch_id": payload.batch_id,
-        "changes": [change.model_dump(mode="json") for change in payload.changes],
-    }
-    return json.dumps(signed, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        "changes": payload.changes,
+    })
 
 
 @router.post("/devices", status_code=status.HTTP_201_CREATED)
