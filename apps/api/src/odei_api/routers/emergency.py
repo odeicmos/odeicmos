@@ -65,6 +65,13 @@ class EmergencyHandoverCreate(BaseModel):
     risk_flags: list[str] = Field(default_factory=list, max_length=20)
 
 
+class EmergencyHandoverAcknowledge(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    acknowledgement_note: str = Field(min_length=2, max_length=1000)
+
+
 class EmergencyDispositionCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tenant_id: str = Field(min_length=3, max_length=64)
@@ -193,6 +200,39 @@ async def create_emergency_handover(episode_id: str, payload: EmergencyHandoverC
             await _audit(db, session, principal, "emergency.handover.create", "emergency_handover",
                          handover_id, payload.tenant_id, payload.facility_id, {"episode_id": episode_id})
     return {"handover_id": handover_id, "status": "awaiting_acknowledgement"}
+
+
+@router.post("/episodes/{episode_id}/handovers/{handover_id}/acknowledge")
+async def acknowledge_emergency_handover(episode_id: str, handover_id: str,
+                                         payload: EmergencyHandoverAcknowledge, request: Request,
+                                         principal: Principal = Depends(require_principal)):
+    db = _db(request)
+    await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, ED_ROLES)
+    now = datetime.now(timezone.utc)
+    async with await request.app.state.mongo_client.start_session() as session:
+        async with session.start_transaction():
+            await _episode(db, payload.tenant_id, payload.facility_id, episode_id, session)
+            handover = await db.emergency_handovers.find_one({
+                "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "episode_id": episode_id, "handover_id": handover_id,
+                "status": "awaiting_acknowledgement",
+            }, session=session)
+            if handover is None:
+                raise HTTPException(status_code=404, detail="Pending emergency handover not found")
+            if handover["author_issuer"] == principal.issuer and handover["author_subject"] == principal.subject:
+                raise HTTPException(status_code=403, detail="Handover author cannot acknowledge their own handover")
+            changed = await db.emergency_handovers.update_one(
+                {"_id": handover["_id"], "status": "awaiting_acknowledgement"},
+                {"$set": {"status": "acknowledged", "acknowledgement_note": payload.acknowledgement_note,
+                          "acknowledged_at": now, "acknowledger_issuer": principal.issuer,
+                          "acknowledger_subject": principal.subject}}, session=session,
+            )
+            if changed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Handover state changed; reload before retrying")
+            await _audit(db, session, principal, "emergency.handover.acknowledge",
+                         "emergency_handover", handover_id, payload.tenant_id,
+                         payload.facility_id, {"episode_id": episode_id})
+    return {"handover_id": handover_id, "status": "acknowledged", "acknowledged_at": now}
 
 
 @router.post("/episodes/{episode_id}/disposition")
