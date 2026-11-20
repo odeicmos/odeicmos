@@ -402,3 +402,16 @@ Requires a facility registration role. Search uses either an exact facility MRN 
 ### `POST /api/v1/patients/identity-match/reviews`
 
 Requires facility_admin, clinician, nurse, receptionist or medical_records_officer. Records a human review outcome (same person, different person or more information required) with rationale. It does not merge or overwrite patient records. Duplicate resolution, enterprise MPI, cross-facility identity linking, verified identity evidence, guardian/proxy relationships and consent/legal-basis workflows remain outstanding.
+
+
+## Patient privacy and consent event API (initial)
+
+### `POST /api/v1/privacy/consent-events`
+
+Requires a facility-scoped role of `facility_admin`, `clinician`, `nurse`, `medical_records_officer`, `privacy_officer` or `data_protection_officer`. Records a patient-linked, purpose-specific event with data categories, notice version, lawful-basis classification, timezone-aware timestamp and optional evidence reference. Actions are `granted`, `declined` and `withdrawn`. Withdrawal is recorded as a new event and is accepted only when a matching latest consent-based grant exists. Events are never edited by this API.
+
+### `GET /api/v1/privacy/patients/{patient_id}/consent-events?tenant_id=...&facility_id=...`
+
+Returns up to 100 append-only consent events for an active facility role. Reads are audited. The response is an event history, not a legal determination or a complete computed authorization decision.
+
+**Important limits:** This is an initial evidence register, not a consent-management or privacy-compliance certification. It does not determine the lawful basis, prove patient/representative identity, capture a legally valid signature, manage minors/guardianship, enforce purpose-based access to every clinical resource, apply retention/legal holds, support patient data-subject requests, or replace country-specific legal review. Do not interpret a missing consent record as proof that processing is prohibited or permitted; the facility privacy officer must determine and document the applicable legal basis under the approved country profile.
