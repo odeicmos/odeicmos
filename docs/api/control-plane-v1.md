@@ -467,3 +467,13 @@ This is a nursing workflow foundation, not a complete electronic medication/obse
 - `POST /api/v1/emergency/episodes/{episode_id}/disposition`: an authorized clinician or facility administrator records discharge, admission, transfer, referral, leaving before completion or death. Transfer/referral requires a destination. The workflow refuses disposition while an ED handover remains unacknowledged.
 
 This is a documented episode and decision workflow, not an automated emergency clinical decision-support system. It does not determine acuity, prescribe resuscitation, execute admission or external transfer, confirm transport acceptance, perform death certification, or replace locally approved emergency protocols. Triage remains in the clinical API and must be performed/reviewed by trained staff. Actual disposition execution must use the corresponding inpatient, referral, transport and statutory workflows.
+
+
+## Referral lifecycle
+
+- `POST /api/v1/referrals`: creates a referral linked to an active patient and open encounter, with specialty, destination, clinical question, urgency and supporting context.
+- `POST /api/v1/referrals/{referral_id}/decision`: a different authorized clinician records acceptance or decline with rationale and optional planned time.
+- `POST /api/v1/referrals/{referral_id}/complete`: closes an accepted referral with a structured outcome and summary.
+- Referral state transitions are guarded and audited; duplicate terminal transitions are rejected.
+
+This is an initial referral register and decision workflow. Cross-organization identity federation, external provider acknowledgements, secure referral document exchange, transport coordination, appointment scheduling, referral SLA escalation and national referral-network integration are not implemented. An external destination string is a record of intent, not proof that the external provider received or accepted the referral.
