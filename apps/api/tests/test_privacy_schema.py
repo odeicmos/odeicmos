@@ -1,7 +1,10 @@
 import pytest
 from pydantic import ValidationError
 
-from odei_api.routers.privacy import (\n    ConsentEventCreate, DataSubjectRequestCreate,\n    IdentityVerificationCreate, DataSubjectRequestTransition,\n)
+from odei_api.routers.privacy import (
+    ConsentEventCreate, DataSubjectRequestCreate,
+    IdentityVerificationCreate, DataSubjectRequestTransition,
+)
 
 
 def test_consent_event_requires_timezone_and_explicit_purpose():
