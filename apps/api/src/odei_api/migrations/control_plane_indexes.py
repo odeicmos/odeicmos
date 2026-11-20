@@ -550,3 +550,19 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("episode_id", ASCENDING)],
         unique=True, name="uq_emergency_disposition_episode",
     )
+
+
+    await db.referrals.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("referral_id", ASCENDING)],
+        unique=True, name="uq_referral_scope_id",
+    )
+    await db.referrals.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING),
+         ("urgency", ASCENDING), ("created_at", ASCENDING)],
+        name="ix_referral_receiving_queue",
+    )
+    await db.referrals.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING),
+         ("created_at", DESCENDING)],
+        name="ix_referral_patient_history",
+    )
