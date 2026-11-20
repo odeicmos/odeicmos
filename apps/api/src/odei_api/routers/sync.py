@@ -152,6 +152,69 @@ async def enroll_device(
     return {"device_id": payload.device_id, "status": "active", "signature_algorithm": "Ed25519"}
 
 
+class DeviceRevocationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+@router.post("/devices/{device_id}/revoke")
+async def revoke_device(
+    device_id: str, payload: DeviceRevocationCreate, request: Request,
+    principal: Principal = Depends(require_principal),
+):
+    db = _db(request)
+    await authorize_facility_access(
+        request, principal, payload.tenant_id, payload.facility_id, ["facility_admin"]
+    )
+    now = datetime.now(timezone.utc)
+    result = await db.sync_devices.update_one(
+        {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+         "device_id": device_id, "status": "active"},
+        {"$set": {"status": "revoked", "revoked_at": now,
+                  "revoked_by_issuer": principal.issuer,
+                  "revoked_by_subject": principal.subject,
+                  "revocation_reason": payload.reason}},
+    )
+    if result.modified_count != 1:
+        raise HTTPException(status_code=404, detail="Active enrolled device not found")
+    await append_audit_event(
+        db, actor_id=f"{principal.issuer}|{principal.subject}",
+        action="sync.device.revoke", resource_type="sync_device",
+        resource_id=device_id, tenant_id=payload.tenant_id,
+        outcome="success", metadata={"facility_id": payload.facility_id, "reason": payload.reason},
+    )
+    return {"device_id": device_id, "status": "revoked", "revoked_at": now}
+
+
+@router.get("/inbox/{change_id}")
+async def get_sync_change(
+    change_id: str, tenant_id: str, facility_id: str, request: Request,
+    principal: Principal = Depends(require_principal),
+):
+    db = _db(request)
+    await authorize_facility_access(
+        request, principal, tenant_id, facility_id,
+        ["facility_admin", "medical_records_officer", "privacy_officer",
+         "data_protection_officer", "clinician", "nurse", "pharmacist",
+         "lab_scientist", "finance_officer", "procurement_officer"],
+    )
+    change = await db.sync_inbox.find_one({
+        "tenant_id": tenant_id, "facility_id": facility_id, "change_id": change_id,
+    }, projection={"_id": 0})
+    if change is None:
+        raise HTTPException(status_code=404, detail="Synchronization change not found")
+    await append_audit_event(
+        db, actor_id=f"{principal.issuer}|{principal.subject}",
+        action="sync.change.payload.read", resource_type="sync_change",
+        resource_id=change_id, tenant_id=tenant_id, outcome="success",
+        metadata={"facility_id": facility_id, "aggregate_type": change["aggregate_type"],
+                  "status": change["status"]},
+    )
+    return change
+
+
 @router.post("/batches", status_code=status.HTTP_202_ACCEPTED)
 async def receive_sync_batch(
     payload: SyncBatchCreate, request: Request,
