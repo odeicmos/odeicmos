@@ -8,7 +8,6 @@ import base64
 import binascii
 import json
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
