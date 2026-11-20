@@ -348,3 +348,27 @@ Requires facility_admin or hr_manager. Cancels a scheduled shift with a reason a
 Requires facility_admin or claims_officer. Appeals a rejected or partially accepted claim with a reason and optional evidence-object reference. A claim cannot have more than one pending appeal at a time. Appeal submission is audited and retained separately from the original payer decision. The eligibility check endpoint rejects future-dated checks; claim submission rechecks payer activity, invoice status, patient match, currency and eligibility validity.
 
 This does not connect to an insurer or transmit claims externally. Payer-specific formats, preauthorization, electronic submission, remittance advice, settlement and insurer-side adjudication integrations remain unimplemented.
+
+## Facility assets and maintenance
+
+### `POST /api/v1/facility-operations/assets`
+
+Requires facility_admin. Registers a facility asset with category, location, risk class and calibration requirement.
+
+### `POST /api/v1/facility-operations/work-orders`
+
+Requires facility_admin, maintenance_officer or clinical_engineer. Opens an audited work order against an in-service or maintenance asset. Any declared service impact moves the asset to maintenance status until independently released.
+
+### `POST /api/v1/facility-operations/work-orders/{work_order_id}/assign`
+
+Assigns an open work order to a named staff identity subject with a reason.
+
+### `POST /api/v1/facility-operations/work-orders/{work_order_id}/complete`
+
+Only the assigned technician may record work performed and supporting evidence. Completion moves the work order to completed_pending_release; it does not itself return equipment to service.
+
+### `POST /api/v1/facility-operations/work-orders/{work_order_id}/release`
+
+Requires facility_admin or clinical_engineer, and the technician who completed the work cannot release it. A checklist evidence reference and rationale are required before the asset returns to service.
+
+This is an asset and maintenance control foundation. Preventive maintenance schedules, calibration due-date enforcement, vendor contracts, spare-parts inventory, equipment telemetry, biomedical engineering certifications and facility inspections remain outstanding.
