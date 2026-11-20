@@ -97,7 +97,7 @@ This is a conservative status snapshot of committed code, not a production-readi
 | Capability | Current code status | Important remaining work |
 |---|---|---|
 | Reception and queue | Partial | Facility-scoped appointment booking, check-in, queue transitions and transactional audit; live queue dashboard, walk-ins, triage priority and wait-time management |
-| Patient registration | Partial | MPI matching/merge, consent, identity verification, guardianship, duplicate review, offline |
+| Patient registration | Partial | Registration, exact MRN or phone+date-of-birth candidate search, human identity-match review; MPI merge, consent, identity verification, guardianship and offline |
 | OPD | Partial | Encounter, triage capture with human review/disposition, observations, diagnoses, notes and care-plan foundation; validated clinical pathways, orders, referrals, follow-up and decision support |
 | IPD / ADT | Partial | Beds, admissions, transfers, discharge; nursing charts, rounds, escalation and reconciliation |
 | Pharmacy | Partial | Medication orders, FEFO dispensing, stock movements and MAR capture for administered/withheld/refused doses; allergies, interactions, formulary, dose scheduling/safety, partial supply, controlled drugs, returns/recalls |
@@ -150,3 +150,5 @@ No capability marked partial is approved for live patient care, medication use, 
 - Facility operations now includes a scoped asset register and segregated maintenance workflow. Equipment with a recorded service impact remains out of service until a different authorized reviewer releases it with checklist evidence. Preventive maintenance, calibration schedules and facilities inspections remain outstanding.
 
 - Quality and safety now includes append-only incident reporting and investigation notes, role-separated investigation/closure, reporter conflict checks, corrective-action evidence references and audit events. Statutory reporting, CAPA effectiveness and complaints management remain outstanding.
+
+- Patient identity matching now supports facility-scoped candidate search by exact MRN or phone plus date of birth, with an audited human review outcome. It deliberately does not auto-merge records; MPI governance, cross-facility linking, identity proofing and consent remain outstanding.
