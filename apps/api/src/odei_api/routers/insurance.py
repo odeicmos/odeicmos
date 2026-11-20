@@ -56,6 +56,14 @@ class ClaimDecision(BaseModel):
     reason: str = Field(min_length=3, max_length=2000)
 
 
+
+class ClaimAppeal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tenant_id: str = Field(min_length=3, max_length=64)
+    facility_id: str = Field(min_length=3, max_length=64)
+    reason: str = Field(min_length=10, max_length=3000)
+    evidence_reference: str | None = Field(default=None, max_length=300)
+
 def _db(request: Request):
     db = getattr(request.app.state, "mongo_database", None)
     if db is None:
@@ -127,8 +135,12 @@ async def create_claim(payload: ClaimCreate, request: Request,
         "coverage_status": "eligible"})
     if invoice is None or eligibility is None:
         raise HTTPException(status_code=404, detail="Invoice or eligible coverage evidence not found")
-    if invoice["currency"] != payload.currency or payload.claimed_amount_minor > invoice["balance_minor"]:
-        raise HTTPException(status_code=409, detail="Claim currency or amount is inconsistent with invoice balance")
+    payer = await db.payers.find_one({"tenant_id": payload.tenant_id,
+        "facility_id": payload.facility_id, "payer_code": eligibility["payer_code"], "status": "active"})
+    if payer is None:
+        raise HTTPException(status_code=409, detail="Payer is inactive or no longer configured")
+    if invoice.get("status") not in ["issued", "partially_paid"] or invoice["currency"] != payload.currency or payload.claimed_amount_minor > invoice["balance_minor"]:
+        raise HTTPException(status_code=409, detail="Claim requires an open invoice and amount within its outstanding balance")
     now = datetime.now(timezone.utc)
     if eligibility["patient_id"] != invoice["patient_id"]:
         raise HTTPException(status_code=409, detail="Coverage evidence belongs to a different patient")
@@ -180,3 +192,33 @@ async def decide_claim(claim_id: str, payload: ClaimDecision, request: Request,
                 {"decision": payload.decision, "approved_amount_minor": payload.approved_amount_minor})
     return {"claim_id": claim_id, "status": payload.decision,
             "approved_amount_minor": payload.approved_amount_minor, "decided_at": now}
+
+@router.post("/claims/{claim_id}/appeals", status_code=status.HTTP_201_CREATED)
+async def appeal_claim(claim_id: str, payload: ClaimAppeal, request: Request,
+                      principal: Principal = Depends(require_principal)):
+    db = _db(request)
+    await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, CLAIMS_ROLES)
+    now, appeal_id = datetime.now(timezone.utc), str(uuid4())
+    client = request.app.state.mongo_client
+    async with await client.start_session() as session:
+        async with session.start_transaction():
+            claim = await db.insurance_claims.find_one({
+                "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "claim_id": claim_id, "status": {"$in": ["rejected", "partially_accepted"]},
+            }, session=session)
+            if claim is None:
+                raise HTTPException(status_code=404, detail="Rejected or partially accepted claim not found")
+            prior = await db.insurance_claim_appeals.find_one({
+                "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                "claim_id": claim_id, "status": "submitted",
+            }, session=session)
+            if prior:
+                raise HTTPException(status_code=409, detail="An appeal is already awaiting review")
+            await db.insurance_claim_appeals.insert_one(payload.model_dump() | {
+                "appeal_id": appeal_id, "claim_id": claim_id, "invoice_id": claim["invoice_id"],
+                "status": "submitted", "submitted_at": now,
+                "submitted_by_issuer": principal.issuer, "submitted_by_subject": principal.subject,
+            }, session=session)
+            await _audit(db, session, principal, "insurance.claim.appeal", "insurance_claim_appeal",
+                appeal_id, payload.tenant_id, payload.facility_id, {"claim_id": claim_id})
+    return {"appeal_id": appeal_id, "claim_id": claim_id, "status": "submitted", "submitted_at": now}
