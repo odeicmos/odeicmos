@@ -469,3 +469,21 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
          ("occurred_at", ASCENDING)],
         name="ix_data_subject_request_event_timeline",
     )
+
+    await db.sync_devices.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("device_id", ASCENDING)],
+        unique=True, name="uq_sync_device_scope_id",
+    )
+    await db.sync_inbox.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("change_id", ASCENDING)],
+        unique=True, name="uq_sync_change_scope_id",
+    )
+    await db.sync_inbox.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING),
+         ("received_at", ASCENDING)],
+        name="ix_sync_inbox_review_queue",
+    )
+    await db.sync_batches.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("batch_id", ASCENDING)],
+        unique=True, name="uq_sync_batch_scope_id",
+    )
