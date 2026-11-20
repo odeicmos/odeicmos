@@ -43,6 +43,7 @@ class ProcedureSafetyChecklist(BaseModel):
     patient_identity_verified: bool
     procedure_and_site_confirmed: bool
     consent_status: Literal["obtained", "not_required", "deferred"]
+    consent_evidence_reference: str | None = Field(default=None, max_length=500)
     allergies_reviewed: bool
     equipment_and_supplies_checked: bool
     infection_prevention_ready: bool
@@ -148,6 +149,10 @@ async def record_procedure_safety_checklist(procedure_id: str, payload: Procedur
                 raise HTTPException(status_code=404, detail="Requested procedure not found")
             if procedure["requires_consent"] and payload.consent_status != "obtained":
                 raise HTTPException(status_code=422, detail="Documented consent is required for this procedure")
+            if payload.consent_status == "obtained" and not payload.consent_evidence_reference:
+                raise HTTPException(status_code=422, detail="Consent evidence reference is required")
+            if payload.consent_status == "not_required" and procedure["requires_consent"]:
+                raise HTTPException(status_code=422, detail="This procedure requires consent")
             if not all([payload.allergies_reviewed, payload.equipment_and_supplies_checked,
                         payload.infection_prevention_ready]):
                 raise HTTPException(status_code=422, detail="All required safety checks must be completed")
