@@ -487,3 +487,28 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("batch_id", ASCENDING)],
         unique=True, name="uq_sync_batch_scope_id",
     )
+
+
+    await db.nursing_tasks.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("task_id", ASCENDING)],
+        unique=True, name="uq_nursing_task_scope_id",
+    )
+    await db.nursing_tasks.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING),
+         ("priority", ASCENDING), ("due_at", ASCENDING)],
+        name="ix_nursing_task_work_queue",
+    )
+    await db.nursing_tasks.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("patient_id", ASCENDING),
+         ("created_at", DESCENDING)],
+        name="ix_nursing_task_patient_timeline",
+    )
+    await db.nursing_handovers.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("handover_id", ASCENDING)],
+        unique=True, name="uq_nursing_handover_scope_id",
+    )
+    await db.nursing_handovers.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("status", ASCENDING),
+         ("created_at", DESCENDING)],
+        name="ix_nursing_handover_ack_queue",
+    )
