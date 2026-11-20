@@ -105,7 +105,7 @@ This is a conservative status snapshot of committed code, not a production-readi
 | Immunization | Partial | Administration and adverse-event report; schedule, eligibility, consent, cold-chain, follow-up, causality and national reporting |
 | Billing / cash | Partial | Invoices, payments, linked cash sessions, chart of accounts and balanced journal posting; automatic subledger posting, refunds, credit notes, tariffs, tax, reconciliation, period close and reporting |
 | Laboratory | Partial | Orders, specimen collection and preliminary results; accession, multiple containers, QC, verified release, critical-result escalation and LIS |
-| Insurance | Partial | Payers, recorded eligibility, claim submission and manual decision; preauthorization, payer integration, remittance, denial/resubmission and settlement |
+| Insurance | Partial | Payers, eligibility evidence, claim submission, manual payer decision and appeal submission; preauthorization, payer integration, remittance, denial/resubmission and settlement |
 | Emergency | Partial | Encounter type and triage primitives only; emergency protocols, resuscitation, observation/escalation and transfer |
 | Nursing / procedures | Partial | Nursing note and inpatient transfer primitives; task lists, MAR, procedures, checklists and clinical observation escalation |
 | Appointments / referrals | Partial | Booking, check-in and cancellation across appointment/reception APIs; room/resource capacity, waitlists, referrals and reminders |
@@ -144,3 +144,5 @@ No capability marked partial is approved for live patient care, medication use, 
 - Workforce governance now includes a facility-scoped staff register, professional credential submission, independent verification/rejection with rationale, expiry checks and audited staff deactivation. It does not yet manage rosters, attendance, leave or payroll; clinical privileges remain separate from HR status.
 
 - Workforce now includes a first roster workflow: future timezone-aware shifts, overlap checks, serialized per-staff roster writes, cancellation with reason and audit. It does not yet implement leave, swaps, attendance, staffing ratios or payroll.
+
+- Insurance now supports appeal submission for rejected/partially accepted claims, prevents simultaneous pending appeals per claim, rechecks payer activity at submission and rejects future-dated eligibility checks. External insurer transmission and remittance remain outstanding.
