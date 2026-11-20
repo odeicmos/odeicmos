@@ -441,3 +441,8 @@ This is case tracking, not automated fulfilment. It does not disclose, alter, ex
 `GET /api/v1/sync/inbox` — authorized privacy/medical-records/facility roles can inspect pending metadata. Payloads are intentionally omitted from this list response. `POST /api/v1/sync/inbox/{change_id}/review` records accepted-for-manual-reconciliation or rejected with rationale. This decision does not apply the payload.
 
 **Safety boundary:** this is not yet an offline client, encrypted local database, key rotation/revocation console, clock-drift defense, per-change clinical authorization, conflict-resolution engine, or downtime procedure. Payloads remain untrusted and require resource-specific validation and authorized reconciliation before any operational record changes. Deployments must provide TLS, encrypted database/storage backups, device key protection, rate limits and body-size limits. Do not use this intake as a substitute for an approved clinical downtime process.
+
+
+Device revocation: `POST /api/v1/sync/devices/{device_id}/revoke` allows a facility administrator to revoke an active device with a reason. Revoked devices cannot submit additional batches. Key rotation requires revocation and a new controlled enrollment.
+
+Payload inspection: `GET /api/v1/sync/inbox/{change_id}?tenant_id=...&facility_id=...` exposes an individual staged payload only to facility/records/privacy or relevant clinical/finance/procurement roles and audits the read. The list endpoint continues to omit payload bodies.
