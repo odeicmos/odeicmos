@@ -415,3 +415,6 @@ Requires a facility-scoped role of `facility_admin`, `clinician`, `nurse`, `medi
 Returns up to 100 append-only consent events for an active facility role. Reads are audited. The response is an event history, not a legal determination or a complete computed authorization decision.
 
 **Important limits:** This is an initial evidence register, not a consent-management or privacy-compliance certification. It does not determine the lawful basis, prove patient/representative identity, capture a legally valid signature, manage minors/guardianship, enforce purpose-based access to every clinical resource, apply retention/legal holds, support patient data-subject requests, or replace country-specific legal review. Do not interpret a missing consent record as proof that processing is prohibited or permitted; the facility privacy officer must determine and document the applicable legal basis under the approved country profile.
+
+
+Consent-event actions are `granted`, `declined` and `withdrawn` only when the lawful basis is `consent`. A non-consent basis is recorded with `action: basis_recorded`; this avoids falsely representing healthcare delivery or legal obligation as patient consent. Withdrawal requires the latest matching grant to remain unexpired and uses the same purpose and data-category scope.
