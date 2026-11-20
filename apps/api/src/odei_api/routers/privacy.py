@@ -28,7 +28,7 @@ class ConsentEventCreate(BaseModel):
     patient_id: str = Field(min_length=1, max_length=64)
     purpose_code: str = Field(min_length=2, max_length=100, pattern=r"^[a-zA-Z0-9_.:-]+$")
     data_categories: list[str] = Field(min_length=1, max_length=30)
-    action: Literal["granted", "declined", "withdrawn"]
+    action: Literal["granted", "declined", "withdrawn", "basis_recorded"]
     lawful_basis: Literal[
         "consent", "healthcare_delivery", "legal_obligation",
         "public_health", "vital_interests", "other_authorized_basis",
@@ -88,15 +88,21 @@ async def record_consent_event(
         raise HTTPException(status_code=422, detail="recorded_at cannot be in the future")
     if payload.expires_at is not None and payload.expires_at <= payload.recorded_at:
         raise HTTPException(status_code=422, detail="expires_at must be after recorded_at")
-    if payload.action == "withdrawn" and payload.lawful_basis != "consent":
-        raise HTTPException(status_code=422, detail="Only consent-based permissions can be withdrawn")
+    if payload.action in ["granted", "declined", "withdrawn"] and payload.lawful_basis != "consent":
+        raise HTTPException(status_code=422, detail="Consent decisions must use the consent lawful basis")
+    if payload.action == "basis_recorded" and payload.lawful_basis == "consent":
+        raise HTTPException(status_code=422, detail="Use a consent decision for the consent lawful basis")
     if payload.action == "withdrawn":
         latest = await db.patient_consent_events.find_one({
             "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
             "patient_id": payload.patient_id, "purpose_code": payload.purpose_code,
-            "data_categories": {"$all": payload.data_categories},
         }, sort=[("recorded_at", -1), ("created_at", -1)])
-        if latest is None or latest.get("action") != "granted" or latest.get("lawful_basis") != "consent":
+        categories_match = latest is not None and set(latest.get("data_categories", [])) == set(payload.data_categories)
+        grant_unexpired = latest is not None and (
+            latest.get("expires_at") is None or latest["expires_at"] > now
+        )
+        if (not categories_match or latest.get("action") != "granted"
+                or latest.get("lawful_basis") != "consent" or not grant_unexpired):
             raise HTTPException(status_code=409, detail="No active matching consent grant can be withdrawn")
 
     event_id = str(uuid4())
