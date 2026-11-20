@@ -152,3 +152,6 @@ No capability marked partial is approved for live patient care, medication use, 
 - Quality and safety now includes append-only incident reporting and investigation notes, role-separated investigation/closure, reporter conflict checks, corrective-action evidence references and audit events. Statutory reporting, CAPA effectiveness and complaints management remain outstanding.
 
 - Patient identity matching now supports facility-scoped candidate search by exact MRN or phone plus date of birth, with an audited human review outcome. It deliberately does not auto-merge records; MPI governance, cross-facility linking, identity proofing and consent remain outstanding.
+
+
+- Patient privacy now has an initial facility-scoped consent-event register: append-only grant/decline/withdrawal events, purpose and data-category scope, lawful-basis classification, notice version, timezone-aware timestamps, evidence references, audited history reads and scoped indexes. This is not yet a full consent, privacy-rights, retention, guardianship or purpose-based access enforcement system; country-specific legal review remains mandatory.
