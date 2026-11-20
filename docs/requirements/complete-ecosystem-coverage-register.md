@@ -155,3 +155,5 @@ No capability marked partial is approved for live patient care, medication use, 
 
 
 - Patient privacy now has an initial facility-scoped consent-event register: append-only grant/decline/withdrawal events, purpose and data-category scope, lawful-basis classification, notice version, timezone-aware timestamps, evidence references, audited history reads and scoped indexes. This is not yet a full consent, privacy-rights, retention, guardianship or purpose-based access enforcement system; country-specific legal review remains mandatory.
+
+- Privacy now also includes initial data-subject request case tracking for access, correction, portability, restriction, erasure and objection. Requester identity verification is recorded by privacy officers, status transitions are constrained, and event/audit histories are appended. This does not itself fulfil requests or determine legal exemptions/deadlines.
