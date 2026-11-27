@@ -55,7 +55,7 @@ Shared platform capabilities include identity, tenant/facility policy, workflow 
 
 ## Repository status
 
-The repository now contains a FastAPI/MongoDB backend foundation with 22 registered domain routers, schema and selected workflow tests, a standalone control-plane prototype, and architecture/operations documentation. Many workflows remain partial and the platform is not certified or approved for live clinical use. See the [full project audit](docs/audits/full-project-audit-2026-11-27.md) for the verified implementation boundary and release blockers.
+The repository now contains a FastAPI/MongoDB backend foundation with 22 registered domain routers, schema and selected workflow tests, a standalone control-plane prototype, and architecture/operations documentation. Many workflows remain partial and the platform is not certified or approved for live clinical use. See the [full project audit](docs/audits/full-project-audit-2026-11-27.md) and the [latest re-audit](docs/audits/re-audit-2026-11-27.md) for the verified implementation boundary and release blockers.
 
 Implementation is planned in verified increments:
 
@@ -93,7 +93,7 @@ No license or regulatory certification is implied by this initial repository con
 
 The seven approved engineering milestones and their exit gates are tracked in [the engineering roadmap](docs/operations/engineering-roadmap.md).
 
-The FastAPI application is under `apps/api/`. It provides OIDC RS256/JWKS authentication, MongoDB persistence, facility-scoped domain APIs, control-plane registry operations, audit event writes and a growing set of guarded workflow endpoints. These are development foundations, not a complete or production-ready clinic system. Those are the first M1 implementation tasks. Install the package with:
+The FastAPI application is under `apps/api/`. It provides OIDC RS256/JWKS authentication, MongoDB persistence, facility-scoped domain APIs, control-plane registry operations, audit event writes and a growing set of guarded workflow endpoints. These are development foundations, not a complete or production-ready clinic system. Install the package with:
 
 ```bash
 cd apps/api
@@ -102,7 +102,7 @@ uvicorn odei_api.main:app --reload
 pytest
 ```
 
-The readiness endpoint must remain not-ready until dependency checks for the database, identity provider and secret manager are implemented and verified.
+Readiness currently verifies MongoDB connectivity, the applied baseline schema marker, and a usable OIDC JWKS document. It does not yet verify a production secret manager, object storage, workers/outbox, telemetry, external integrations, or the full operational dependency set. A `ready` response is therefore a limited API dependency signal, not production release approval.
 
 
 ## Current backend increment
@@ -110,3 +110,6 @@ The readiness endpoint must remain not-ready until dependency checks for the dat
 The API now includes OIDC JWT verification (RS256/JWKS, issuer, audience and time claims), a platform-admin-only control-plane registry for tenants, organizations and facilities, facility role-assignment provisioning, transactional audit writes, MongoDB index migrations and schema tests. See the [control-plane API contract](docs/api/control-plane-v1.md) and [bootstrap runbook](docs/operations/control-plane-bootstrap-runbook.md).
 
 This remains an early, unverified development foundation: no production identity provider, MongoDB deployment or external integration has been connected and accepted. The API now applies a bounded JWKS cache, checks facility active status and role effective dates, supports audited role revocation, and checks MongoDB plus the configured OIDC JWKS endpoint at readiness. Production authorization governance, audit immutability, access reviews, comprehensive integration tests and all release gates remain open. Clinical endpoints are not approved for live care.
+
+
+The current schema migration runner applies an idempotent baseline index set and records `2026.11.27.1` only after all index operations succeed. This is an initial migration ledger marker, not yet a complete ordered migration framework with checksums, rollback, distributed locking, or drift remediation.
