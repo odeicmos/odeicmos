@@ -127,7 +127,7 @@ async def receive_payment(invoice_id: str, payload: PaymentCreate, request: Requ
                 cash_session = await db.cash_sessions.find_one({
                     "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                     "cash_session_id": payload.cash_session_id, "status": "open",
-                    "opening_by_issuer": principal.issuer, "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject,
+                    "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject,
                     "currency": invoice["currency"],
                 }, session=session)
                 if cash_session is None:
