@@ -7,6 +7,7 @@ from pymongo import AsyncMongoClient
 
 from odei_api.config import get_settings
 from odei_api.security import check_identity_provider_ready
+from odei_api.migrations.control_plane_indexes import CURRENT_SCHEMA_VERSION
 from odei_api.routers.control_plane import router as control_plane_router
 from odei_api.routers.patients import router as patients_router
 from odei_api.routers.clinical import router as clinical_router
@@ -83,6 +84,14 @@ def create_app() -> FastAPI:
             )
         try:
             await request.app.state.mongo_database.command("ping")
+            migration = await request.app.state.mongo_database.schema_migrations.find_one({
+                "_id": CURRENT_SCHEMA_VERSION, "status": "applied",
+            })
+            if migration is None:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail={"status": "not_ready", "reason": "schema_migrations_pending"},
+                )
             await check_identity_provider_ready()
         except HTTPException as exc:
             raise HTTPException(
@@ -95,7 +104,7 @@ def create_app() -> FastAPI:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail={"status": "not_ready", "reason": "dependency_check_failed"},
             ) from exc
-        return {"status": "ready", "dependencies": "mongodb,oidc_jwks"}
+        return {"status": "ready", "dependencies": "mongodb,schema_migrations,oidc_jwks"}
 
     app.include_router(control_plane_router, prefix=settings.api_prefix)
     app.include_router(patients_router, prefix=settings.api_prefix)
