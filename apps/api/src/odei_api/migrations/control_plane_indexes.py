@@ -143,8 +143,24 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("cash_session_id", ASCENDING)],
         unique=True, name="uq_cash_session_scope_id",
     )
+    # Operator identifiers are issuer-scoped OIDC subjects. Replace indexes created
+    # by earlier builds that keyed only on subject, which can collide across issuers.
+    cash_indexes = await db.cash_sessions.index_information()
+    operator_index = cash_indexes.get("ix_cash_session_operator_status")
+    if operator_index and operator_index.get("key") != [
+        ("tenant_id", 1), ("facility_id", 1), ("opening_by_issuer", 1),
+        ("opened_by_subject", 1), ("status", 1),
+    ]:
+        await db.cash_sessions.drop_index("ix_cash_session_operator_status")
+    unique_operator_index = cash_indexes.get("uq_one_open_cash_session_per_operator")
+    if unique_operator_index and unique_operator_index.get("key") != [
+        ("tenant_id", 1), ("facility_id", 1), ("opening_by_issuer", 1),
+        ("opened_by_subject", 1),
+    ]:
+        await db.cash_sessions.drop_index("uq_one_open_cash_session_per_operator")
     await db.cash_sessions.create_index(
-        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("opened_by_subject", ASCENDING), ("status", ASCENDING)],
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING),
+         ("opening_by_issuer", ASCENDING), ("opened_by_subject", ASCENDING), ("status", ASCENDING)],
         name="ix_cash_session_operator_status",
     )
     await db.purchase_orders.create_index(
@@ -319,7 +335,8 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
 
 
     await db.cash_sessions.create_index(
-        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("opened_by_subject", ASCENDING)],
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING),
+         ("opening_by_issuer", ASCENDING), ("opened_by_subject", ASCENDING)],
         unique=True, partialFilterExpression={"status": "open"},
         name="uq_one_open_cash_session_per_operator",
     )
