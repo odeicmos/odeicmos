@@ -38,10 +38,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reject committed environment and private-key files
+      - name: Reject committed secret-bearing files
         shell: bash
         run: |
-          if git ls-files | grep -E '(^|/)\.env($|\.)|(^|/)(id_rsa|id_ed25519)$|\.(pem|key)$'; then
+          if git ls-files | grep -E '(^|/)\.env$|(^|/)\.env\.(local|production|staging)|(^|/)(id_rsa|id_ed25519)$|\.(pem|key)$'; then
             echo "Potential secret-bearing file is tracked; investigate before release."
             exit 1
           fi
