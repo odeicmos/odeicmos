@@ -62,6 +62,14 @@ def _db(request: Request):
     return db
 
 
+def _cash_session_operator_scope(principal: Principal) -> dict[str, str]:
+    """Scope cash-drawer ownership by the issuer-qualified OIDC identity."""
+    return {
+        "opening_by_issuer": principal.issuer,
+        "opened_by_subject": principal.subject,
+    }
+
+
 @router.post("/invoices", status_code=status.HTTP_201_CREATED)
 async def create_invoice(payload: InvoiceCreate, request: Request,
                          principal: Principal = Depends(require_principal)):
@@ -127,7 +135,7 @@ async def receive_payment(invoice_id: str, payload: PaymentCreate, request: Requ
                 cash_session = await db.cash_sessions.find_one({
                     "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                     "cash_session_id": payload.cash_session_id, "status": "open",
-                    "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject,
+                    **_cash_session_operator_scope(principal),
                     "currency": invoice["currency"],
                 }, session=session)
                 if cash_session is None:
@@ -187,7 +195,7 @@ async def open_cash_session(payload: CashSessionOpen, request: Request,
         async with session.start_transaction():
             active = await db.cash_sessions.find_one({
                 "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-                "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject, "status": "open",
+                **_cash_session_operator_scope(principal), "status": "open",
             }, session=session)
             if active:
                 raise HTTPException(status_code=409, detail="Cash session already open for this operator")
