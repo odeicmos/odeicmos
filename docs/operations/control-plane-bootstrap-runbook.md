@@ -26,7 +26,7 @@ Do not use production data or credentials in local development.
 ## Readiness
 
 - `GET /health/live` means only that the process responds.
-- `GET /health/ready` verifies MongoDB connectivity.
+- `GET /health/ready` verifies MongoDB connectivity, the applied baseline schema marker, and a usable configured OIDC JWKS document. It does not verify workers, object storage, secrets-provider health, or external integrations.
 - Identity configuration is independently required for protected control-plane routes.
 - No route should be considered production-ready until authorization, audit grants, tenant isolation and operational tests pass.
 
@@ -36,7 +36,7 @@ The first platform administrator must be provisioned through the selected identi
 
 ## Database migrations
 
-Run versioned migrations using a separately authorized migration identity before starting the API. Review index names and existing data before applying. Never run migrations automatically on every API process startup.
+Run the currently implemented baseline index/schema migration using a separately authorized migration identity before starting the API. From `apps/api/`, install the package (`python -m pip install -e .`) and execute `odei-migrate` with `ODEI_MONGODB_URI` injected by the secret manager. The command applies the idempotent baseline index set and records schema marker `2026.11.27.1` only after all index operations succeed. Never run migrations automatically on every API process startup. This is not yet a general ordered migration framework with checksums, locking, rollback, or drift remediation.
 
 ## Registry API
 
