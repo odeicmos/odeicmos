@@ -1,6 +1,10 @@
-"""Versioned MongoDB indexes for ODEI control-plane collections."""
+"""Versioned MongoDB indexes for ODEI collections and schema readiness."""
+from datetime import datetime, timezone
+
 from pymongo import ASCENDING, DESCENDING
 from pymongo.asynchronous.database import AsyncDatabase
+
+CURRENT_SCHEMA_VERSION = "2026.11.27.1"
 
 
 async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
@@ -596,4 +600,16 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
     await db.procedure_safety_checks.create_index(
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("procedure_id", ASCENDING)],
         unique=True, name="uq_procedure_checklist_per_procedure",
+    )
+
+    # Record the baseline only after every index operation succeeds. The API readiness
+    # probe uses this marker to avoid serving traffic against an unprepared database.
+    await db.schema_migrations.update_one(
+        {"_id": CURRENT_SCHEMA_VERSION},
+        {"$setOnInsert": {
+            "migration_name": "baseline_domain_indexes",
+            "status": "applied",
+            "applied_at": datetime.now(timezone.utc),
+        }},
+        upsert=True,
     )
