@@ -1,11 +1,16 @@
 """OIDC JWT verification and facility-scoped authorization primitives."""
+import asyncio
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Iterable
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import httpx
 import jwt
 from jwt.algorithms import RSAAlgorithm
+
 from odei_api.config import get_settings
 
 _bearer = HTTPBearer(auto_error=False)
@@ -19,22 +24,55 @@ class Principal:
 
 
 class OidcVerifier:
+    """RS256 verifier with bounded JWKS cache lifetime and serialized refresh."""
+
     def __init__(self) -> None:
         self._jwks: dict[str, Any] | None = None
+        self._jwks_loaded_at = 0.0
+        self._refresh_lock = asyncio.Lock()
 
-    async def _load_jwks(self, url: str) -> dict[str, Any]:
-        if self._jwks is None:
-            try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.get(url)
-                    response.raise_for_status()
-                    payload = response.json()
-                if not isinstance(payload, dict) or not isinstance(payload.get("keys"), list):
-                    raise ValueError("Invalid JWKS document")
-                self._jwks = payload
-            except (httpx.HTTPError, ValueError) as exc:
-                raise HTTPException(status_code=503, detail="Identity verification service unavailable") from exc
-        return self._jwks
+    async def _load_jwks(self, url: str, *, force_refresh: bool = False) -> dict[str, Any]:
+        settings = get_settings()
+        ttl = max(30, min(settings.oidc_jwks_cache_seconds, 3600))
+        fresh = self._jwks is not None and (time.monotonic() - self._jwks_loaded_at) < ttl
+        if force_refresh or not fresh:
+            async with self._refresh_lock:
+                fresh = self._jwks is not None and (time.monotonic() - self._jwks_loaded_at) < ttl
+                if force_refresh or not fresh:
+                    try:
+                        async with httpx.AsyncClient(timeout=5.0) as client:
+                            response = await client.get(url)
+                            response.raise_for_status()
+                            payload = response.json()
+                        if not isinstance(payload, dict) or not isinstance(payload.get("keys"), list):
+                            raise ValueError("Invalid JWKS document")
+                        valid_keys = [
+                            key for key in payload["keys"]
+                            if isinstance(key, dict)
+                            and key.get("kty") == "RSA"
+                            and isinstance(key.get("kid"), str)
+                            and key.get("kid")
+                            and key.get("use", "sig") == "sig"
+                            and key.get("alg", "RS256") in (None, "RS256")
+                        ]
+                        if not valid_keys:
+                            raise ValueError("JWKS contains no usable RS256 signing keys")
+                        self._jwks = {"keys": valid_keys}
+                        self._jwks_loaded_at = time.monotonic()
+                    except (httpx.HTTPError, ValueError) as exc:
+                        self._jwks = None
+                        self._jwks_loaded_at = 0.0
+                        raise HTTPException(
+                            status_code=503,
+                            detail="Identity verification service unavailable",
+                        ) from exc
+        return self._jwks or {"keys": []}
+
+    async def check_jwks(self) -> None:
+        settings = get_settings()
+        if not all((settings.oidc_issuer, settings.oidc_audience, settings.oidc_jwks_url)):
+            raise HTTPException(status_code=503, detail="Identity provider is not configured")
+        await self._load_jwks(settings.oidc_jwks_url or "")
 
     async def verify(self, token: str) -> Principal:
         settings = get_settings()
@@ -49,11 +87,10 @@ class OidcVerifier:
             if not isinstance(kid, str) or not kid:
                 raise ValueError("Missing signing key identifier")
             jwks = await self._load_jwks(settings.oidc_jwks_url or "")
-            key_data = next((key for key in jwks["keys"] if key.get("kid") == kid and key.get("kty") == "RSA"), None)
+            key_data = next((key for key in jwks["keys"] if key.get("kid") == kid), None)
             if not key_data:
-                self._jwks = None
-                jwks = await self._load_jwks(settings.oidc_jwks_url or "")
-                key_data = next((key for key in jwks["keys"] if key.get("kid") == kid and key.get("kty") == "RSA"), None)
+                jwks = await self._load_jwks(settings.oidc_jwks_url or "", force_refresh=True)
+                key_data = next((key for key in jwks["keys"] if key.get("kid") == kid), None)
             if not key_data:
                 raise ValueError("Signing key not found")
             public_key = RSAAlgorithm.from_jwk(key_data)
@@ -72,6 +109,10 @@ class OidcVerifier:
 
 
 _verifier = OidcVerifier()
+
+
+async def check_identity_provider_ready() -> None:
+    await _verifier.check_jwks()
 
 
 async def require_principal(
@@ -98,10 +139,16 @@ async def authorize_facility_access(
     facility_id: str,
     allowed_roles: Iterable[str],
 ) -> str:
-    """Return the matched role or fail closed for the requested facility scope."""
+    """Return an active role only when facility and assignment are currently effective."""
     db = getattr(request.app.state, "mongo_database", None)
     if db is None:
         raise HTTPException(status_code=503, detail="Authorization store unavailable")
+    now = datetime.now(timezone.utc)
+    facility = await db.facilities.find_one({
+        "tenant_id": tenant_id, "facility_id": facility_id, "status": "active",
+    })
+    if facility is None:
+        raise HTTPException(status_code=403, detail="Facility is not active or accessible")
     assignment = await db.role_assignments.find_one({
         "tenant_id": tenant_id,
         "facility_id": facility_id,
@@ -109,7 +156,11 @@ async def authorize_facility_access(
         "user_id": principal.subject,
         "status": "active",
         "role": {"$in": list(allowed_roles)},
+        "$and": [
+            {"$or": [{"effective_from": None}, {"effective_from": {"$exists": False}}, {"effective_from": {"$lte": now}}]},
+            {"$or": [{"effective_until": None}, {"effective_until": {"$exists": False}}, {"effective_until": {"$gt": now}}]},
+        ],
     })
     if assignment is None:
-        raise HTTPException(status_code=403, detail="No permitted role for this facility")
+        raise HTTPException(status_code=403, detail="No currently effective role for this facility")
     return str(assignment["role"])
