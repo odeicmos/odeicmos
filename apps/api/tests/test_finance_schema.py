@@ -47,3 +47,18 @@ def test_cash_session_currency_is_iso_shape_and_float_nonnegative():
             tenant_id="tenant-a", facility_id="facility-a",
             currency="ug", opening_float_minor=10000,
         )
+
+
+def test_cash_session_operator_scope_uses_issuer_and_subject() -> None:
+    from odei_api.routers.finance import _cash_session_operator_scope
+    from odei_api.security import Principal
+
+    principal = Principal(
+        issuer="https://identity.example/issuer-a",
+        subject="operator-123",
+        claims={},
+    )
+    assert _cash_session_operator_scope(principal) == {
+        "opening_by_issuer": "https://identity.example/issuer-a",
+        "opened_by_subject": "operator-123",
+    }
