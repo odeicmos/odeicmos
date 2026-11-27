@@ -127,7 +127,7 @@ async def receive_payment(invoice_id: str, payload: PaymentCreate, request: Requ
                 cash_session = await db.cash_sessions.find_one({
                     "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                     "cash_session_id": payload.cash_session_id, "status": "open",
-                    "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject,
+                    "opening_by_issuer": principal.issuer, "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject,
                     "currency": invoice["currency"],
                 }, session=session)
                 if cash_session is None:
@@ -187,12 +187,12 @@ async def open_cash_session(payload: CashSessionOpen, request: Request,
         async with session.start_transaction():
             active = await db.cash_sessions.find_one({
                 "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-                "opened_by_subject": principal.subject, "status": "open",
+                "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject, "status": "open",
             }, session=session)
             if active:
                 raise HTTPException(status_code=409, detail="Cash session already open for this operator")
             await db.cash_sessions.insert_one(record | {
-                "opened_by_subject": principal.subject,
+                "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject,
             }, session=session)
             await append_audit_event(
                 db, actor_id=f"{principal.issuer}|{principal.subject}",
@@ -215,7 +215,7 @@ async def close_cash_session(cash_session_id: str, payload: CashSessionClose, re
             cash = await db.cash_sessions.find_one({
                 "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
                 "cash_session_id": cash_session_id, "status": "open",
-                "opened_by_subject": principal.subject,
+                "opening_by_issuer": principal.issuer, "opened_by_subject": principal.subject,
             }, session=session)
             if cash is None:
                 raise HTTPException(status_code=404, detail="Open cash session not found for operator")
