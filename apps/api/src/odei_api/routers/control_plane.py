@@ -1,9 +1,14 @@
 """Platform registry routes. Global mutations require verified platform-admin identity."""
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pymongo.errors import DuplicateKeyError
+
 from odei_api.audit import append_audit_event
-from odei_api.schemas import TenantCreate, OrganizationCreate, FacilityCreate, RoleAssignmentCreate
+from odei_api.schemas import (
+    TenantCreate, OrganizationCreate, FacilityCreate, RoleAssignmentCreate,
+    RoleAssignmentRevoke,
+)
 from odei_api.security import Principal, require_platform_admin
 
 router = APIRouter(prefix="/control-plane", tags=["control-plane"])
@@ -117,9 +122,52 @@ async def create_role_assignment(
         await _insert_with_audit(
             request, "role_assignments", record, actor=principal.subject,
             action="role_assignment.create", resource_type="role_assignment",
-            resource_id=f"{payload.user_id}:{payload.facility_id}:{payload.role}",
+            resource_id=f"{payload.user_issuer}:{payload.user_id}:{payload.facility_id}:{payload.role}",
             tenant_id=payload.tenant_id,
         )
     except DuplicateKeyError as exc:
         raise HTTPException(status_code=409, detail="Role assignment already exists") from exc
-    return {"status": "active", "role": payload.role, "facility_id": payload.facility_id}
+    return {
+        "status": "active", "role": payload.role, "facility_id": payload.facility_id,
+        "effective_from": payload.effective_from, "effective_until": payload.effective_until,
+    }
+
+
+@router.post("/role-assignments/revoke")
+async def revoke_role_assignment(
+    payload: RoleAssignmentRevoke, request: Request,
+    principal: Principal = Depends(require_platform_admin),
+):
+    db = database(request)
+    now = datetime.now(timezone.utc)
+    query = {
+        "tenant_id": payload.tenant_id,
+        "facility_id": payload.facility_id,
+        "user_issuer": payload.user_issuer,
+        "user_id": payload.user_id,
+        "role": payload.role,
+        "status": "active",
+    }
+    client = request.app.state.mongo_client
+    async with await client.start_session() as session:
+        async with session.start_transaction():
+            assignment = await db.role_assignments.find_one(query, session=session)
+            if assignment is None:
+                raise HTTPException(status_code=404, detail="Active role assignment not found")
+            result = await db.role_assignments.update_one(
+                {**query, "_id": assignment["_id"]},
+                {"$set": {
+                    "status": "revoked", "revoked_at": now,
+                    "revoked_by": principal.subject, "revocation_reason": payload.reason,
+                }},
+                session=session,
+            )
+            if result.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Role assignment changed; retry")
+            await append_audit_event(
+                db, actor_id=principal.subject, action="role_assignment.revoke",
+                resource_type="role_assignment",
+                resource_id=f"{payload.user_issuer}:{payload.user_id}:{payload.facility_id}:{payload.role}",
+                tenant_id=payload.tenant_id, outcome="success", session=session,
+            )
+    return {"status": "revoked", "role": payload.role, "facility_id": payload.facility_id}
