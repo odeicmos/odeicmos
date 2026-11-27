@@ -171,3 +171,15 @@ No capability marked partial is approved for live patient care, medication use, 
 - Referral management now includes patient/encounter-linked referral creation, urgency and specialty capture, receiving-side acceptance/decline with independent actor and rationale, and outcome-based closure. External receipt and partner interoperability remain unimplemented.
 
 - Procedures now have patient/encounter-linked requests, documented safety checklist, team time-out gate, procedure start and outcome/findings/complications/post-care recording. This does not validate legal consent, clinician privileges, equipment sterility or specialty-specific safety protocols.
+
+
+## Security remediation increment — 2026-11-27
+
+- OIDC JWKS cache now has a bounded configurable lifetime (30–3600 seconds, default 300), serialized refresh, signing-key filtering and forced refresh on an unknown key identifier. This remains process-local and does not replace issuer key-rotation monitoring.
+- Facility authorization now requires an active facility and an active role assignment whose optional timezone-aware effective dates include the current time.
+- Platform administrators can revoke a facility role assignment with a mandatory reason; state change and audit event are transactional. Revoked role history is retained, and the scoped unique index now applies only to active assignments so a role can be reissued after revocation.
+- Readiness now pings MongoDB and retrieves a usable configured OIDC JWKS document. It still does not validate every production dependency or migration version.
+- `.env.example` now matches the actual `ODEI_*` settings prefix. The migration CLI entry point is corrected to `odei-migrate`; package version is aligned to API version 0.5.0.
+- README status claims are corrected; CI now runs on all repository pushes/PRs, compiles Python sources, runs focused correctness lint and API tests, and checks for tracked secret-bearing files and required governance documents.
+- Added tests for effective role periods, inactive facilities, role revocation request validation, JWKS cache refresh, invalid signing-key documents and cache setting bounds.
+- These changes are development safeguards only. Database migration execution, route-level authorization integration, DB audit immutability, end-to-end transactions and production identity integration still require real replica-set/identity-provider tests.
