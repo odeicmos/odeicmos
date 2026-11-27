@@ -60,5 +60,5 @@ def test_cash_session_operator_scope_uses_issuer_and_subject() -> None:
     )
     assert _cash_session_operator_scope(principal) == {
         "opening_by_issuer": "https://identity.example/issuer-a",
-        "opened_by_subject": "operator-123",
+        "opening_by_subject": "operator-123",
     }
