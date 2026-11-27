@@ -24,9 +24,16 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
     await db.users.create_index(
         [("issuer", ASCENDING), ("subject", ASCENDING)], unique=True, name="uq_oidc_subject"
     )
+    # Revoked assignments are historical records. Only one active assignment for a
+    # user/role/facility may exist; old full unique indexes must be replaced safely.
+    role_indexes = await db.role_assignments.index_information()
+    existing_role_index = role_indexes.get("uq_scoped_role_assignment")
+    if existing_role_index and not existing_role_index.get("partialFilterExpression"):
+        await db.role_assignments.drop_index("uq_scoped_role_assignment")
     await db.role_assignments.create_index(
         [("tenant_id", ASCENDING), ("user_issuer", ASCENDING), ("user_id", ASCENDING), ("facility_id", ASCENDING), ("role", ASCENDING)],
-        unique=True, name="uq_scoped_role_assignment",
+        unique=True, partialFilterExpression={"status": "active"},
+        name="uq_scoped_role_assignment",
     )
     await db.patients.create_index(
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("medical_record_number", ASCENDING)],
