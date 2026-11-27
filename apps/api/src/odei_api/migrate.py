@@ -1,4 +1,4 @@
-"""Run explicit control-plane MongoDB index migration using migration credentials."""
+"""Apply the idempotent baseline schema/index migration using migration credentials."""
 import asyncio
 from pymongo import AsyncMongoClient
 from odei_api.config import get_settings
