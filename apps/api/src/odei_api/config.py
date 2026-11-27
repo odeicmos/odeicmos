@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     oidc_audience: str | None = None
     oidc_jwks_url: str | None = None
     oidc_allowed_algorithms: tuple[str, ...] = ("RS256",)
+    oidc_jwks_cache_seconds: int = Field(default=300, ge=30, le=3600)
 
 
 @lru_cache
