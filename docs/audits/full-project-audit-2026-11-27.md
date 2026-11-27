@@ -340,3 +340,19 @@ ODEI has a substantial early backend foundation and useful domain-specific workf
 The most important immediate work is not adding more isolated endpoints. It is completing the security and governance foundation, making the existing workflows testable end to end, implementing missing read/workbench surfaces and ledgers, building the production frontend/control plane, and proving clinical and operational safety in a production-equivalent environment.
 
 **No omission claim:** This report inventories the complete file tree returned for the reviewed `main` tree and assesses the major application, API, security, tests, docs, country profile and delivery surfaces. It is a static audit snapshot, not proof that every runtime behavior, external service, secret, deployment setting or clinical/legal obligation has been tested. Re-audit after material code changes and before any release.
+
+
+## 13. Remediation changes committed after this audit snapshot
+
+The following corrective changes have since been committed to `main`:
+
+- OIDC JWKS cache now expires after a bounded configurable TTL (default 300 seconds; accepted setting range 30–3600 seconds), serializes refreshes and refreshes on unknown key IDs.
+- Facility authorization now checks that the facility itself is active and that the role assignment's optional effective-from/effective-until dates are currently valid.
+- A platform-admin-only role revocation endpoint records mandatory rationale, actor and timestamp, and writes the audit event in the same MongoDB transaction.
+- Role assignment uniqueness is now limited to active assignments, preserving revoked history while permitting re-assignment.
+- Readiness checks MongoDB connectivity and fetches a usable OIDC JWKS document rather than checking configuration strings only.
+- Corrected the stale README implementation claims, the environment-variable example (actual settings use the `ODEI_` prefix), and the migration CLI command typo.
+- CI now triggers for repository-wide changes, compiles Python sources, runs focused lint and API tests, and checks tracked files for likely secrets.
+- Added tests for effective-date validation, inactive facility denial, JWKS refresh/filtering and configuration bounds.
+
+**Verification caution:** These commits have been pushed, but their newest CI run was still pending/in progress at the time this update was written. Do not treat them as green until the latest run completes. The broader project gaps in sections 4–11 remain open.
