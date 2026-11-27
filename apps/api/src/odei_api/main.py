@@ -87,22 +87,23 @@ def create_app() -> FastAPI:
             migration = await request.app.state.mongo_database.schema_migrations.find_one({
                 "_id": CURRENT_SCHEMA_VERSION, "status": "applied",
             })
-            if migration is None:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail={"status": "not_ready", "reason": "schema_migrations_pending"},
-                )
+        except Exception as exc:
+            logger.exception("Database readiness dependency check failed")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"status": "not_ready", "reason": "database_dependency_check_failed"},
+            ) from exc
+        if migration is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"status": "not_ready", "reason": "schema_migrations_pending"},
+            )
+        try:
             await check_identity_provider_ready()
         except HTTPException as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail={"status": "not_ready", "reason": "identity_provider_unavailable_or_unconfigured"},
-            ) from exc
-        except Exception as exc:
-            logger.exception("Readiness dependency check failed")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={"status": "not_ready", "reason": "dependency_check_failed"},
             ) from exc
         return {"status": "ready", "dependencies": "mongodb,schema_migrations,oidc_jwks"}
 
