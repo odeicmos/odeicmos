@@ -55,7 +55,7 @@ Shared platform capabilities include identity, tenant/facility policy, workflow 
 
 ## Repository status
 
-This repository was empty at initial inspection. The supplied product documents define a target architecture and requirements; they do not establish that application code, integrations, validation or regulatory approvals already exist.
+The repository now contains a FastAPI/MongoDB backend foundation with 22 registered domain routers, schema and selected workflow tests, a standalone control-plane prototype, and architecture/operations documentation. Many workflows remain partial and the platform is not certified or approved for live clinical use. See the [full project audit](docs/audits/full-project-audit-2026-11-27.md) for the verified implementation boundary and release blockers.
 
 Implementation is planned in verified increments:
 
@@ -74,7 +74,7 @@ Each module must have automated tests, role/facility checks, audit evidence, neg
 
 Copy `.env.example` to `.env` and provide locally managed development credentials. Never commit `.env`.
 
-The application packages and deployment instructions will be added as implementation work is completed and tested.
+The API package is available under `apps/api/`. A production web frontend, deployment manifests and verified production infrastructure are not yet present.
 
 ## Documentation
 
@@ -93,7 +93,7 @@ No license or regulatory certification is implied by this initial repository con
 
 The seven approved engineering milestones and their exit gates are tracked in [the engineering roadmap](docs/operations/engineering-roadmap.md).
 
-The first FastAPI scaffold is under `apps/api/`. It currently provides process liveness and an intentionally negative readiness response. It does **not** yet provide authentication, MongoDB persistence, authorization, audit persistence or production-ready business endpoints. Those are the first M1 implementation tasks. Install the package with:
+The FastAPI application is under `apps/api/`. It provides OIDC RS256/JWKS authentication, MongoDB persistence, facility-scoped domain APIs, control-plane registry operations, audit event writes and a growing set of guarded workflow endpoints. These are development foundations, not a complete or production-ready clinic system. Those are the first M1 implementation tasks. Install the package with:
 
 ```bash
 cd apps/api
@@ -109,4 +109,4 @@ The readiness endpoint must remain not-ready until dependency checks for the dat
 
 The API now includes OIDC JWT verification (RS256/JWKS, issuer, audience and time claims), a platform-admin-only control-plane registry for tenants, organizations and facilities, facility role-assignment provisioning, transactional audit writes, MongoDB index migrations and schema tests. See the [control-plane API contract](docs/api/control-plane-v1.md) and [bootstrap runbook](docs/operations/control-plane-bootstrap-runbook.md).
 
-This remains an early M1 foundation: no identity provider or MongoDB deployment has been connected and verified; JWKS cache hardening, delegated administration, facility-role authorization middleware, role revocation/expiry and access reviews remain open. No patient-facing clinical endpoints are enabled.
+This remains an early, unverified development foundation: no production identity provider, MongoDB deployment or external integration has been connected and accepted. The API now applies a bounded JWKS cache, checks facility active status and role effective dates, supports audited role revocation, and checks MongoDB plus the configured OIDC JWKS endpoint at readiness. Production authorization governance, audit immutability, access reviews, comprehensive integration tests and all release gates remain open. Clinical endpoints are not approved for live care.
