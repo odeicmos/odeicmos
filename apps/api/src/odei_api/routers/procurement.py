@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from odei_api.audit import append_audit_event
 from odei_api.security import Principal, authorize_facility_access, require_principal
 
@@ -49,6 +49,14 @@ class PurchaseOrderCreate(BaseModel):
     lines: list[PurchaseOrderLine] = Field(min_length=1, max_length=100)
     notes: str | None = Field(default=None, max_length=2000)
 
+    @field_validator("lines")
+    @classmethod
+    def require_unique_item_codes(cls, values):
+        codes = [line.item_code for line in values]
+        if len(codes) != len(set(codes)):
+            raise ValueError("purchase order item_code values must be unique")
+        return values
+
 
 class GoodsReceiptCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -79,6 +87,7 @@ async def create_purchase_order(payload: PurchaseOrderCreate, request: Request,
         raise HTTPException(status_code=422, detail="Purchase order total exceeds supported limit")
     order_id, now = str(uuid4()), datetime.now(timezone.utc)
     record = payload.model_dump() | {
+        "lines": [line.model_dump() | {"received_quantity": 0} for line in payload.lines],
         "purchase_order_id": order_id, "total_minor": total, "status": "draft",
         "created_at": now, "created_by_issuer": principal.issuer,
         "created_by_subject": principal.subject,
@@ -130,6 +139,36 @@ async def receive_goods(payload: GoodsReceiptCreate, request: Request,
             received = already[0]["quantity"] if already else 0
             if received + payload.quantity_received > line["quantity"]:
                 raise HTTPException(status_code=409, detail="Receipt exceeds ordered quantity")
+
+            # Make concurrent receipts contend on the same purchase-order document.
+            # The aggregate remains the source of truth for legacy receipts; the
+            # conditional line update provides the write-conflict/CAS boundary.
+            received_quantity_filter = (
+                {"$exists": False}
+                if "received_quantity" not in line
+                else line["received_quantity"]
+            )
+            line_update = await db.purchase_orders.update_one(
+                {
+                    "_id": order["_id"],
+                    "status": "approved_for_receipt",
+                    "lines": {"$elemMatch": {
+                        "item_code": payload.item_code,
+                        "received_quantity": received_quantity_filter,
+                    }},
+                },
+                {"$set": {
+                    "lines.$.received_quantity": received + payload.quantity_received,
+                    "last_receipt_at": now,
+                }},
+                session=session,
+            )
+            if line_update.modified_count != 1:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Purchase order receipt state changed; reload and retry",
+                )
+
             await db.goods_receipts.insert_one(payload.model_dump() | {
                 "receipt_id": receipt_id, "received_at": now,
                 "received_by_issuer": principal.issuer, "received_by_subject": principal.subject,
