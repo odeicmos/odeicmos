@@ -17,6 +17,11 @@ PRESCRIBER_ROLES = ["facility_admin", "clinician"]
 DISPENSER_ROLES = ["facility_admin", "pharmacist"]
 
 
+def _unexpired_lot_filter(now: datetime) -> dict:
+    """Match lots with a future expiry or no expiry date, consistently on read and write."""
+    return {"$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": None}]}
+
+
 class MedicationLine(BaseModel):
     model_config = ConfigDict(extra="forbid")
     medication_code: str = Field(min_length=1, max_length=80)
@@ -141,14 +146,14 @@ async def dispense_medication_order(
                         "facility_id": payload.facility_id,
                         "medication_code": line["medication_code"],
                         "status": "active", "quantity_on_hand": {"$gt": 0},
-                        "$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": None}],
+                        **_unexpired_lot_filter(now),
                     }, session=session).sort([("expiry_at", ASCENDING), ("received_at", ASCENDING)])
                     async for lot in lots:
                         take = min(remaining, int(lot["quantity_on_hand"]))
                         changed = await db.inventory_lots.update_one({
                             "_id": lot["_id"], "quantity_on_hand": {"$gte": take},
                             "status": "active",
-                            "$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": {"$exists": False}}],
+                            **_unexpired_lot_filter(now),
                         }, {"$inc": {"quantity_on_hand": -take}}, session=session)
                         if changed.modified_count != 1:
                             continue
