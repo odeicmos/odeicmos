@@ -74,8 +74,8 @@ def _db(request: Request):
     return db
 
 
-def _withdrawal_is_chronological(latest_event: dict | None, recorded_at: datetime) -> bool:
-    """A consent withdrawal must not be timestamped before the grant it withdraws."""
+def _consent_event_is_chronological(latest_event: dict | None, recorded_at: datetime) -> bool:
+    """A new consent event must not be timestamped before the latest recorded event."""
     return latest_event is not None and recorded_at >= latest_event["recorded_at"]
 
 
@@ -105,17 +105,18 @@ async def record_consent_event(
         raise HTTPException(status_code=422, detail="Consent decisions must use the consent lawful basis")
     if payload.action == "basis_recorded" and payload.lawful_basis == "consent":
         raise HTTPException(status_code=422, detail="Use a consent decision for the consent lawful basis")
+    latest = await db.patient_consent_events.find_one({
+        "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+        "patient_id": payload.patient_id, "purpose_code": payload.purpose_code,
+    }, sort=[("recorded_at", -1), ("created_at", -1)])
+    if latest is not None and not _consent_event_is_chronological(latest, payload.recorded_at):
+        raise HTTPException(status_code=422, detail="Consent event timestamp cannot predate the latest event")
+
     if payload.action == "withdrawn":
-        latest = await db.patient_consent_events.find_one({
-            "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-            "patient_id": payload.patient_id, "purpose_code": payload.purpose_code,
-        }, sort=[("recorded_at", -1), ("created_at", -1)])
         categories_match = latest is not None and set(latest.get("data_categories", [])) == set(payload.data_categories)
         grant_unexpired = latest is not None and (
             latest.get("expires_at") is None or latest["expires_at"] > now
         )
-        if latest is not None and not _withdrawal_is_chronological(latest, payload.recorded_at):
-            raise HTTPException(status_code=422, detail="Withdrawal timestamp cannot predate the latest consent event")
         if (not categories_match or latest.get("action") != "granted"
                 or latest.get("lawful_basis") != "consent" or not grant_unexpired):
             raise HTTPException(status_code=409, detail="No active matching consent grant can be withdrawn")
