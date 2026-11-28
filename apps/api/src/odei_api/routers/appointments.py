@@ -1,5 +1,6 @@
 """Appointment booking, check-in and cancellation foundation."""
 from datetime import datetime, timezone
+from hashlib import sha256
 from typing import Literal
 from uuid import uuid4
 
@@ -70,25 +71,46 @@ async def book_appointment(payload: AppointmentCreate, request: Request,
     if payload.starts_at <= now:
         raise HTTPException(status_code=422, detail="New appointments must start in the future")
     client = request.app.state.mongo_client
-    async with await client.start_session() as session:
-        async with session.start_transaction():
-            if payload.practitioner_subject:
-                conflict = await db.appointments.find_one({
-                    "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-                    "practitioner_subject": payload.practitioner_subject,
-                    "status": {"$in": ["booked", "checked_in"]},
-                    "starts_at": {"$lt": payload.ends_at}, "ends_at": {"$gt": payload.starts_at},
-                }, session=session, projection={"_id": 1})
-                if conflict:
-                    raise HTTPException(status_code=409, detail="Practitioner has an overlapping appointment")
-            await db.appointments.insert_one(payload.model_dump() | {
-                "appointment_id": appointment_id, "status": "booked",
-                "created_at": now, "created_by_issuer": principal.issuer,
-                "created_by_subject": principal.subject,
-            }, session=session)
-            await _audit(db, session, principal, "appointment.book", appointment_id,
-                         payload.tenant_id, payload.facility_id,
-                         {"patient_id": payload.patient_id, "starts_at": payload.starts_at})
+    try:
+        async with await client.start_session() as session:
+            async with session.start_transaction():
+                if payload.practitioner_subject:
+                    # Serialize bookings for the same practitioner before checking
+                    # interval overlap. Without a shared write, concurrent snapshots
+                    # can both observe an empty slot and insert conflicting bookings.
+                    lock_key = sha256(
+                        f"{payload.tenant_id}\\0{payload.facility_id}\\0{payload.practitioner_subject}".encode()
+                    ).hexdigest()
+                    await db.appointment_schedule_locks.update_one(
+                        {"_id": lock_key},
+                        {"$inc": {"revision": 1}, "$set": {
+                            "tenant_id": payload.tenant_id,
+                            "facility_id": payload.facility_id,
+                            "practitioner_subject": payload.practitioner_subject,
+                            "updated_at": now,
+                        }},
+                        upsert=True, session=session,
+                    )
+                    conflict = await db.appointments.find_one({
+                        "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                        "practitioner_subject": payload.practitioner_subject,
+                        "status": {"$in": ["booked", "checked_in"]},
+                        "starts_at": {"$lt": payload.ends_at}, "ends_at": {"$gt": payload.starts_at},
+                    }, session=session, projection={"_id": 1})
+                    if conflict:
+                        raise HTTPException(status_code=409, detail="Practitioner has an overlapping appointment")
+                await db.appointments.insert_one(payload.model_dump() | {
+                    "appointment_id": appointment_id, "status": "booked",
+                    "created_at": now, "created_by_issuer": principal.issuer,
+                    "created_by_subject": principal.subject,
+                }, session=session)
+                await _audit(db, session, principal, "appointment.book", appointment_id,
+                             payload.tenant_id, payload.facility_id,
+                             {"patient_id": payload.patient_id, "starts_at": payload.starts_at})
+    except Exception as exc:
+        if exc.__class__.__name__ == "DuplicateKeyError":
+            raise HTTPException(status_code=409, detail="Practitioner schedule is being updated; retry booking") from exc
+        raise
     return {"appointment_id": appointment_id, "status": "booked", "created_at": now}
 
 
