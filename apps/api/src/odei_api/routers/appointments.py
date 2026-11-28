@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pymongo.errors import DuplicateKeyError
 from odei_api.audit import append_audit_event
 from odei_api.security import Principal, authorize_facility_access, require_principal
 
@@ -107,10 +108,8 @@ async def book_appointment(payload: AppointmentCreate, request: Request,
                 await _audit(db, session, principal, "appointment.book", appointment_id,
                              payload.tenant_id, payload.facility_id,
                              {"patient_id": payload.patient_id, "starts_at": payload.starts_at})
-    except Exception as exc:
-        if exc.__class__.__name__ == "DuplicateKeyError":
-            raise HTTPException(status_code=409, detail="Practitioner schedule is being updated; retry booking") from exc
-        raise
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=409, detail="Practitioner schedule is being updated; retry booking") from exc
     return {"appointment_id": appointment_id, "status": "booked", "created_at": now}
 
 
