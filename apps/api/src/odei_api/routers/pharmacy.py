@@ -21,6 +21,29 @@ def _unexpired_lot_filter(now: datetime) -> dict:
     """Match lots with a future expiry or no expiry date, consistently on read and write."""
     return {"$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": None}]}
 
+def _fefo_lot_pipeline(tenant_id: str, facility_id: str, medication_code: str, now: datetime) -> list[dict]:
+    """Order expiring stock before non-expiring stock, then by receipt time."""
+    return [
+        {"$match": {
+            "tenant_id": tenant_id,
+            "facility_id": facility_id,
+            "medication_code": medication_code,
+            "status": "active",
+            "quantity_on_hand": {"$gt": 0},
+            **_unexpired_lot_filter(now),
+        }},
+        {"$addFields": {
+            "_fefo_expiry_sort": {
+                "$ifNull": ["$expiry_at", datetime(9999, 12, 31, tzinfo=timezone.utc)]
+            }
+        }},
+        {"$sort": {
+            "_fefo_expiry_sort": ASCENDING,
+            "received_at": ASCENDING,
+            "_id": ASCENDING,
+        }},
+    ]
+
 
 class MedicationLine(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -141,13 +164,13 @@ async def dispense_medication_order(
             async with session.start_transaction():
                 for line in order["lines"]:
                     remaining = line["quantity"]
-                    lots = db.inventory_lots.find({
-                        "tenant_id": payload.tenant_id,
-                        "facility_id": payload.facility_id,
-                        "medication_code": line["medication_code"],
-                        "status": "active", "quantity_on_hand": {"$gt": 0},
-                        **_unexpired_lot_filter(now),
-                    }, session=session).sort([("expiry_at", ASCENDING), ("received_at", ASCENDING)])
+                    lots = db.inventory_lots.aggregate(
+                        _fefo_lot_pipeline(
+                            payload.tenant_id, payload.facility_id,
+                            line["medication_code"], now,
+                        ),
+                        session=session,
+                    )
                     async for lot in lots:
                         take = min(remaining, int(lot["quantity_on_hand"]))
                         changed = await db.inventory_lots.update_one({
