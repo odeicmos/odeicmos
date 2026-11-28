@@ -27,7 +27,7 @@ def test_control_plane_routes_reject_missing_identity() -> None:
     ("migration_record", "expected_status", "expected_reason"),
     [
         (None, 503, "schema_migrations_pending"),
-        ({"_id": "2026.11.27.1", "status": "applied"}, 200, None),
+        ({"_id": "2026.11.28.1", "status": "applied"}, 200, None),
     ],
 )
 def test_readiness_requires_applied_schema_migration(
@@ -40,7 +40,7 @@ def test_readiness_requires_applied_schema_migration(
 
     class FakeCollection:
         async def find_one(self, query):
-            assert query == {"_id": "2026.11.27.1", "status": "applied"}
+            assert query == {"_id": "2026.11.28.1", "status": "applied"}
             return migration_record
 
     class FakeDatabase:
