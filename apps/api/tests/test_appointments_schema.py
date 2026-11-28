@@ -1,7 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-from odei_api.routers.appointments import AppointmentCreate, AppointmentAction
+from odei_api.routers.appointments import (
+    AppointmentCreate, AppointmentAction, _practitioner_schedule_lock_id,
+)
 
 
 def scope(**overrides):
@@ -27,3 +29,11 @@ def test_appointment_action_rejects_unexpected_fields():
     assert action.reason
     with pytest.raises(ValidationError):
         AppointmentAction(**scope(unexpected="not allowed"))
+
+
+def test_practitioner_schedule_lock_is_stable_and_facility_scoped():
+    key = _practitioner_schedule_lock_id("tenant-a", "facility-a", "practitioner-1")
+    assert key == _practitioner_schedule_lock_id("tenant-a", "facility-a", "practitioner-1")
+    assert key != _practitioner_schedule_lock_id("tenant-a", "facility-b", "practitioner-1")
+    assert key != _practitioner_schedule_lock_id("tenant-b", "facility-a", "practitioner-1")
+    assert key != _practitioner_schedule_lock_id("tenant-a", "facility-a", "practitioner-2")
