@@ -87,9 +87,15 @@ async def start_investigation(incident_id: str, payload: InvestigationNote, requ
             await db.safety_investigation_notes.insert_one(payload.model_dump() | {
                 "note_id": note_id, "incident_id": incident_id, "recorded_at": now,
                 "recorded_by_issuer": principal.issuer, "recorded_by_subject": principal.subject}, session=session)
-            await db.safety_incidents.update_one({"_id": incident["_id"], "status": "reported"},
+            changed = await db.safety_incidents.update_one(
+                {"_id": incident["_id"], "status": "reported"},
                 {"$set": {"status": "investigating", "investigation_started_at": now,
-                    "investigation_lead_subject": principal.subject}}, session=session)
+                    "investigation_lead_issuer": principal.issuer,
+                    "investigation_lead_subject": principal.subject}},
+                session=session,
+            )
+            if changed.modified_count != 1:
+                raise HTTPException(status_code=409, detail="Incident investigation was started by another user")
             await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
                 action="safety.incident.investigate", resource_type="safety_incident", resource_id=incident_id,
                 tenant_id=payload.tenant_id, outcome="success", metadata={"facility_id": payload.facility_id,
