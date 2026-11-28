@@ -111,7 +111,7 @@ def test_identity_verification_and_request_transitions_require_evidence():
 def test_consent_event_timestamp_cannot_predate_latest_event():
     grant_time = datetime(2026, 11, 20, 10, 0, tzinfo=timezone.utc)
     grant = {"recorded_at": grant_time}
-    assert _withdrawal_is_chronological(grant, grant_time)
+    assert _consent_event_is_chronological(grant, grant_time)
     assert _withdrawal_is_chronological(
         grant, datetime(2026, 11, 20, 10, 1, tzinfo=timezone.utc)
     )
