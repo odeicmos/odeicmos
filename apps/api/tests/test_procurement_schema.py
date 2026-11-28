@@ -69,3 +69,15 @@ def test_purchase_order_action_rejects_unexpected_fields():
         PurchaseOrderAction(
             tenant_id="tenant-a", facility_id="facility-a", approved=True,
         )
+
+
+def test_purchase_order_rejects_duplicate_item_codes():
+    line = {
+        "item_code": "AMOX500", "item_name": "Amoxicillin 500mg",
+        "quantity": 10, "unit_cost_minor": 1500,
+    }
+    with pytest.raises(ValidationError):
+        PurchaseOrderCreate(
+            tenant_id="tenant-a", facility_id="facility-a", supplier_id="supplier-a",
+            currency="UGX", lines=[line, line],
+        )
