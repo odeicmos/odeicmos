@@ -51,6 +51,12 @@ def _db(request: Request):
     return db
 
 
+def _practitioner_schedule_lock_id(tenant_id: str, facility_id: str, practitioner_subject: str) -> str:
+    """Stable, collision-resistant lock key scoped to one facility practitioner."""
+    scope = "\\0".join((tenant_id, facility_id, practitioner_subject))
+    return sha256(scope.encode("utf-8")).hexdigest()
+
+
 async def _audit(db, session, principal, action, appointment_id, tenant_id, facility_id, metadata=None):
     await append_audit_event(db, actor_id=f"{principal.issuer}|{principal.subject}",
         action=action, resource_type="appointment", resource_id=appointment_id,
@@ -79,9 +85,9 @@ async def book_appointment(payload: AppointmentCreate, request: Request,
                     # Serialize bookings for the same practitioner before checking
                     # interval overlap. Without a shared write, concurrent snapshots
                     # can both observe an empty slot and insert conflicting bookings.
-                    lock_key = sha256(
-                        f"{payload.tenant_id}\\0{payload.facility_id}\\0{payload.practitioner_subject}".encode()
-                    ).hexdigest()
+                    lock_key = _practitioner_schedule_lock_id(
+                        payload.tenant_id, payload.facility_id, payload.practitioner_subject
+                    )
                     await db.appointment_schedule_locks.update_one(
                         {"_id": lock_key},
                         {"$inc": {"revision": 1}, "$set": {
