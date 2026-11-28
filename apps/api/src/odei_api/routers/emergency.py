@@ -117,6 +117,17 @@ async def _episode(db, tenant_id, facility_id, episode_id, session=None):
     return item
 
 
+async def _touch_active_episode(db, episode, now, session):
+    """Serialize active-episode child writes against terminal disposition."""
+    changed = await db.emergency_episodes.update_one(
+        {"_id": episode["_id"], "status": "active"},
+        {"$inc": {"activity_revision": 1}, "$set": {"last_activity_at": now}},
+        session=session,
+    )
+    if changed.modified_count != 1:
+        raise HTTPException(status_code=409, detail="Emergency episode is no longer active")
+
+
 @router.post("/episodes", status_code=status.HTTP_201_CREATED)
 async def create_emergency_episode(payload: EmergencyEpisodeCreate, request: Request,
                                    principal: Principal = Depends(require_principal)):
@@ -166,6 +177,7 @@ async def record_emergency_event(episode_id: str, payload: EmergencyEventCreate,
             episode = await _episode(db, payload.tenant_id, payload.facility_id, episode_id, session)
             if episode["status"] != "active":
                 raise HTTPException(status_code=409, detail="Emergency episode is not active")
+            await _touch_active_episode(db, episode, now, session)
             record = payload.model_dump() | {
                 "event_id": event_id, "episode_id": episode_id,
                 "patient_id": episode["patient_id"], "encounter_id": episode["encounter_id"],
@@ -190,6 +202,7 @@ async def create_emergency_handover(episode_id: str, payload: EmergencyHandoverC
             episode = await _episode(db, payload.tenant_id, payload.facility_id, episode_id, session)
             if episode["status"] != "active":
                 raise HTTPException(status_code=409, detail="Emergency episode is not active")
+            await _touch_active_episode(db, episode, now, session)
             record = payload.model_dump() | {
                 "handover_id": handover_id, "episode_id": episode_id,
                 "patient_id": episode["patient_id"], "encounter_id": episode["encounter_id"],
