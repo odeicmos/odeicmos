@@ -128,12 +128,6 @@ async def enroll_device(
 ):
     db = _db(request)
     await authorize_facility_access(request, principal, payload.tenant_id, payload.facility_id, ["facility_admin"])
-    existing = await db.sync_devices.find_one({
-        "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-        "device_id": payload.device_id,
-    })
-    if existing:
-        raise HTTPException(status_code=409, detail="Device identifier already enrolled; use a controlled key-rotation workflow")
     now = datetime.now(timezone.utc)
     record = {
         "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
@@ -142,13 +136,25 @@ async def enroll_device(
         "created_by_issuer": principal.issuer, "created_by_subject": principal.subject,
         "last_seen_at": None,
     }
-    await db.sync_devices.insert_one(record)
-    await append_audit_event(
-        db, actor_id=f"{principal.issuer}|{principal.subject}",
-        action="sync.device.enroll", resource_type="sync_device",
-        resource_id=payload.device_id, tenant_id=payload.tenant_id,
-        outcome="success", metadata={"facility_id": payload.facility_id, "label": payload.label},
-    )
+    try:
+        async with await request.app.state.mongo_client.start_session() as session:
+            async with session.start_transaction():
+                existing = await db.sync_devices.find_one({
+                    "tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                    "device_id": payload.device_id,
+                }, session=session)
+                if existing:
+                    raise HTTPException(status_code=409, detail="Device identifier already enrolled; use a controlled key-rotation workflow")
+                await db.sync_devices.insert_one(record, session=session)
+                await append_audit_event(
+                    db, actor_id=f"{principal.issuer}|{principal.subject}",
+                    action="sync.device.enroll", resource_type="sync_device",
+                    resource_id=payload.device_id, tenant_id=payload.tenant_id,
+                    outcome="success", metadata={"facility_id": payload.facility_id, "label": payload.label},
+                    session=session,
+                )
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=409, detail="Device identifier already enrolled; use a controlled key-rotation workflow") from exc
     return {"device_id": payload.device_id, "status": "active", "signature_algorithm": "Ed25519"}
 
 
@@ -169,22 +175,26 @@ async def revoke_device(
         request, principal, payload.tenant_id, payload.facility_id, ["facility_admin"]
     )
     now = datetime.now(timezone.utc)
-    result = await db.sync_devices.update_one(
-        {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
-         "device_id": device_id, "status": "active"},
-        {"$set": {"status": "revoked", "revoked_at": now,
-                  "revoked_by_issuer": principal.issuer,
-                  "revoked_by_subject": principal.subject,
-                  "revocation_reason": payload.reason}},
-    )
-    if result.modified_count != 1:
-        raise HTTPException(status_code=404, detail="Active enrolled device not found")
-    await append_audit_event(
-        db, actor_id=f"{principal.issuer}|{principal.subject}",
-        action="sync.device.revoke", resource_type="sync_device",
-        resource_id=device_id, tenant_id=payload.tenant_id,
-        outcome="success", metadata={"facility_id": payload.facility_id, "reason": payload.reason},
-    )
+    async with await request.app.state.mongo_client.start_session() as session:
+        async with session.start_transaction():
+            result = await db.sync_devices.update_one(
+                {"tenant_id": payload.tenant_id, "facility_id": payload.facility_id,
+                 "device_id": device_id, "status": "active"},
+                {"$set": {"status": "revoked", "revoked_at": now,
+                          "revoked_by_issuer": principal.issuer,
+                          "revoked_by_subject": principal.subject,
+                          "revocation_reason": payload.reason}},
+                session=session,
+            )
+            if result.modified_count != 1:
+                raise HTTPException(status_code=404, detail="Active enrolled device not found")
+            await append_audit_event(
+                db, actor_id=f"{principal.issuer}|{principal.subject}",
+                action="sync.device.revoke", resource_type="sync_device",
+                resource_id=device_id, tenant_id=payload.tenant_id,
+                outcome="success", metadata={"facility_id": payload.facility_id, "reason": payload.reason},
+                session=session,
+            )
     return {"device_id": device_id, "status": "revoked", "revoked_at": now}
 
 
@@ -263,10 +273,12 @@ async def receive_sync_batch(
             async with session.start_transaction():
                 await db.sync_batches.insert_one(batch_record, session=session)
                 await db.sync_inbox.insert_many(staged, ordered=True, session=session)
-                await db.sync_devices.update_one(
+                device_touch = await db.sync_devices.update_one(
                     {"_id": device["_id"], "status": "active"},
                     {"$set": {"last_seen_at": now}}, session=session,
                 )
+                if device_touch.modified_count != 1:
+                    raise HTTPException(status_code=409, detail="Device was revoked while the batch was being received")
                 await append_audit_event(
                     db, actor_id=f"{principal.issuer}|{principal.subject}",
                     action="sync.batch.receive", resource_type="sync_batch",
