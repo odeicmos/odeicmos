@@ -1,6 +1,7 @@
 """Appointment booking, check-in and cancellation foundation."""
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 from typing import Literal
 from uuid import uuid4
 
@@ -53,7 +54,7 @@ def _db(request: Request):
 
 def _practitioner_schedule_lock_id(tenant_id: str, facility_id: str, practitioner_subject: str) -> str:
     """Stable, collision-resistant lock key scoped to one facility practitioner."""
-    scope = "\\0".join((tenant_id, facility_id, practitioner_subject))
+    scope = json.dumps([tenant_id, facility_id, practitioner_subject], ensure_ascii=False, separators=(",", ":"))
     return sha256(scope.encode("utf-8")).hexdigest()
 
 
