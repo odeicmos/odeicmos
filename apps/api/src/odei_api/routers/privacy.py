@@ -74,6 +74,11 @@ def _db(request: Request):
     return db
 
 
+def _withdrawal_is_chronological(latest_event: dict | None, recorded_at: datetime) -> bool:
+    """A consent withdrawal must not be timestamped before the grant it withdraws."""
+    return latest_event is not None and recorded_at >= latest_event["recorded_at"]
+
+
 @router.post("/consent-events", status_code=status.HTTP_201_CREATED)
 async def record_consent_event(
     payload: ConsentEventCreate,
@@ -109,6 +114,8 @@ async def record_consent_event(
         grant_unexpired = latest is not None and (
             latest.get("expires_at") is None or latest["expires_at"] > now
         )
+        if latest is not None and not _withdrawal_is_chronological(latest, payload.recorded_at):
+            raise HTTPException(status_code=422, detail="Withdrawal timestamp cannot predate the latest consent event")
         if (not categories_match or latest.get("action") != "granted"
                 or latest.get("lawful_basis") != "consent" or not grant_unexpired):
             raise HTTPException(status_code=409, detail="No active matching consent grant can be withdrawn")
