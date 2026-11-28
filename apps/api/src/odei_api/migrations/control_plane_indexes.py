@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pymongo import ASCENDING, DESCENDING
 from pymongo.asynchronous.database import AsyncDatabase
 
-CURRENT_SCHEMA_VERSION = "2026.11.27.1"
+CURRENT_SCHEMA_VERSION = "2026.11.28.1"
 
 
 async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
@@ -331,6 +331,13 @@ async def apply_control_plane_indexes(db: AsyncDatabase) -> None:
     await db.appointments.create_index(
         [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("practitioner_subject", ASCENDING), ("starts_at", ASCENDING), ("ends_at", ASCENDING)],
         name="ix_appointment_practitioner_time",
+    )
+
+    # Creating this index also provisions the lock collection before API transactions
+    # attempt their first upsert into it.
+    await db.appointment_schedule_locks.create_index(
+        [("tenant_id", ASCENDING), ("facility_id", ASCENDING), ("practitioner_subject", ASCENDING)],
+        unique=True, name="uq_appointment_schedule_lock_scope",
     )
 
 
