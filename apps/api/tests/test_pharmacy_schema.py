@@ -1,7 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from odei_api.routers.pharmacy import MedicationLine, MedicationOrderCreate
+from datetime import datetime, timezone
+
+from odei_api.routers.pharmacy import (
+    MedicationLine,
+    MedicationOrderCreate,
+    _unexpired_lot_filter,
+)
 
 
 def test_medication_line_requires_positive_bounded_quantity():
@@ -34,3 +40,10 @@ def test_medication_order_requires_at_least_one_line_and_rejects_extra_fields():
         MedicationOrderCreate(**(values | {"lines": []}))
     with pytest.raises(ValidationError):
         MedicationOrderCreate(**(values | {"unexpected": "field"}))
+
+
+def test_fefo_filter_accepts_unexpired_and_non_expiring_lots():
+    now = datetime(2026, 11, 27, tzinfo=timezone.utc)
+    assert _unexpired_lot_filter(now) == {
+        "$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": None}]
+    }
