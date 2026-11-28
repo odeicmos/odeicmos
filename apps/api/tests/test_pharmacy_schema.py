@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from odei_api.routers.pharmacy import (
     MedicationLine,
     MedicationOrderCreate,
+    _fefo_lot_pipeline,
     _unexpired_lot_filter,
 )
 
@@ -46,4 +47,18 @@ def test_fefo_filter_accepts_unexpired_and_non_expiring_lots():
     now = datetime(2026, 11, 27, tzinfo=timezone.utc)
     assert _unexpired_lot_filter(now) == {
         "$or": [{"expiry_at": {"$gt": now}}, {"expiry_at": None}]
+    }
+
+
+def test_fefo_pipeline_sorts_non_expiring_lots_after_expiring_lots():
+    now = datetime(2026, 11, 27, tzinfo=timezone.utc)
+    pipeline = _fefo_lot_pipeline("tenant-a", "facility-a", "AMOX500", now)
+    assert pipeline[0]["$match"]["tenant_id"] == "tenant-a"
+    assert pipeline[0]["$match"]["facility_id"] == "facility-a"
+    assert pipeline[0]["$match"]["$or"] == [
+        {"expiry_at": {"$gt": now}}, {"expiry_at": None}
+    ]
+    assert pipeline[1]["$addFields"]["_fefo_expiry_sort"]["$ifNull"][0] == "$expiry_at"
+    assert pipeline[2]["$sort"] == {
+        "_fefo_expiry_sort": 1, "received_at": 1, "_id": 1
     }
